@@ -1,5 +1,5 @@
 package com.ikongserver.dto;
 
-public class authDto {
+public class DeviceDto {
 
 }

@@ -1,5 +1,5 @@
 package com.ikongserver.dto;
 
-public class guardianDto {
+public class GuardianDto {
 
 }

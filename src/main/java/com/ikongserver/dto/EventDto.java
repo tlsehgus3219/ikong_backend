@@ -1,5 +1,5 @@
 package com.ikongserver.dto;
 
-public class eventDto {
+public class EventDto {
 
 }

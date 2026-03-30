@@ -1,5 +1,5 @@
 package com.ikongserver.dto;
 
-public class statsDto {
+public class StatsDto {
 
 }
