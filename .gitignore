@@ -50,3 +50,6 @@ application-prod.properties
 # 스프링부트 서버 실행 시 생성되는 로그 파일 제외
 *.log
 logs/
+
+### 클로드 ai ###
+.claude/
