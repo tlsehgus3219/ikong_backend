@@ -37,6 +37,8 @@ public class Notification {
 
     private String message;
 
+    private String status = "SUCCESS";
+
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime sentAt;
@@ -48,10 +50,11 @@ public class Notification {
     }
 
     @Builder
-    public Notification(EmergencyEvent emergencyEvent, Guardian guardian, String message) {
+    public Notification(EmergencyEvent emergencyEvent, Guardian guardian, String message, String status) {
         this.emergencyEvent = emergencyEvent;
         this.guardian = guardian;
         this.message = message;
+        this.status = status != null ? status : "SUCCESS";
     }
 
 }

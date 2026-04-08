@@ -1,5 +1,41 @@
 package com.ikongserver.dto;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import lombok.Builder;
+import lombok.Getter;
+
 public class NotificationDto {
 
+    @Getter
+    public static class CreateNotificationRequest {
+        private Long eventId;
+        private Long guardianId;
+        private String message;
+    }
+
+    @Getter
+    @Builder
+    public static class CreateNotificationResponse {
+        private Long notificationId;
+        private String message;
+        private LocalDateTime sentAt;
+    }
+
+    @Getter
+    @Builder
+    public static class NotificationItem {
+        private Long notificationId;
+        private String message;
+        private String status;
+        private LocalDateTime sentAt;
+        private String readYN;
+    }
+
+    @Getter
+    @Builder
+    public static class NotificationListResponse {
+        private long total;
+        private List<NotificationItem> notifications;
+    }
 }
