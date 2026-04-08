@@ -21,7 +21,7 @@ import org.hibernate.annotations.CreationTimestamp;
 @Getter
 @NoArgsConstructor
 @Table(name = "vital", indexes = {
-    @Index(name = "idx_vital_recorded_at", columnList = "recordedAt")
+    @Index(name = "idx_vital_device_time", columnList = "device_id, recorded_at DESC")
 })
 public class Vital {
 
