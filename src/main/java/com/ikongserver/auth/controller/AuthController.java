@@ -6,6 +6,8 @@ import com.ikongserver.dto.AuthDto.LoginResponse;
 import com.ikongserver.dto.AuthDto.LogoutRequest;
 import com.ikongserver.dto.AuthDto.RefreshRequest;
 import com.ikongserver.dto.AuthDto.RefreshResponse;
+import com.ikongserver.dto.AuthDto.SignupRequest;
+import com.ikongserver.dto.AuthDto.SignupResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,6 +21,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+
+    @PostMapping("/signup")
+    public ResponseEntity<SignupResponse> signup(@RequestBody SignupRequest request) {
+        return ResponseEntity.ok(authService.signup(request));
+    }
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> kakaoLogin(@RequestBody KakaoLoginRequest request) {

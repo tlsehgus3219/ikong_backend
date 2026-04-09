@@ -5,6 +5,8 @@ import com.ikongserver.dto.AuthDto.LoginResponse;
 import com.ikongserver.dto.AuthDto.LogoutRequest;
 import com.ikongserver.dto.AuthDto.RefreshRequest;
 import com.ikongserver.dto.AuthDto.RefreshResponse;
+import com.ikongserver.dto.AuthDto.SignupRequest;
+import com.ikongserver.dto.AuthDto.SignupResponse;
 import com.ikongserver.entity.Guardian;
 import com.ikongserver.entity.LogoutToken;
 import com.ikongserver.entity.Users;
@@ -27,6 +29,27 @@ public class AuthService {
     private final GuardianRepository guardianRepository;
     private final LogoutTokenRepository logoutTokenRepository;
     private final JwtUtil jwtUtil;
+
+    @Transactional
+    public SignupResponse signup(SignupRequest request) {
+        if (usersRepository.existsByEmail(request.getEmail())) {
+            throw new RuntimeException("이미 사용 중인 이메일입니다.");
+        }
+
+        Users user = usersRepository.save(Users.builder()
+                .email(request.getEmail())
+                .password(request.getPassword())
+                .name(request.getName())
+                .phone(request.getPhone())
+                .birthDate(request.getBirthDate())
+                .build());
+
+        return SignupResponse.builder()
+                .userId(user.getId())
+                .email(user.getEmail())
+                .name(user.getName())
+                .build();
+    }
 
     @Transactional
     public LoginResponse kakaoLogin(KakaoLoginRequest request) {

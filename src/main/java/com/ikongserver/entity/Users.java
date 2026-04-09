@@ -25,6 +25,9 @@ public class Users {
     @Column(name = "user_id")
     private Long id;
 
+    @Column(unique = true)
+    private String email;
+
     private String password;
 
     @Column(nullable = false)
@@ -52,7 +55,8 @@ public class Users {
     }
 
     @Builder
-    public Users(String password, String name, String phone, LocalDate birthDate, String socialId) {
+    public Users(String email, String password, String name, String phone, LocalDate birthDate, String socialId) {
+        this.email = email;
         this.password = password;
         this.name = name;
         this.phone = phone;

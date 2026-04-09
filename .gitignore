@@ -39,6 +39,7 @@ out/
 ### Security & Properties (매우 중요) ###
 # DB 비밀번호, 소셜 로그인 API 키 등 민감한 정보가 담긴 환경별 설정 파일 제외
 application-dev.properties
+application-main.properties
 application-prod.properties
 *secret*.properties
 

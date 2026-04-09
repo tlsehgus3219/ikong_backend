@@ -1,11 +1,31 @@
 package com.ikongserver.dto;
 
+import java.time.LocalDate;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
 public class AuthDto {
+
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class SignupRequest {
+        private String email;
+        private String password;
+        private String name;
+        private String phone;
+        private LocalDate birthDate; // 선택
+    }
+
+    @Getter
+    @Builder
+    public static class SignupResponse {
+        private Long userId;
+        private String email;
+        private String name;
+    }
 
     @Getter
     @NoArgsConstructor
