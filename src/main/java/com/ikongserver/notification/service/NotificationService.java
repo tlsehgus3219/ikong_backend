@@ -37,7 +37,7 @@ public class NotificationService {
                         .emergencyEvent(event)
                         .guardian(guardian)
                         .message(request.getMessage())
-                        .status("SUCCESS")
+                        .status(request.getStatus() != null ? request.getStatus() : "SUCCESS")
                         .build()
         );
 
