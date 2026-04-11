@@ -12,18 +12,18 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/device")
+@RequestMapping("/api/devices")
 public class DeviceController {
 
     private final DeviceService deviceService;
 
-    // 디바이스 연결 상태
-    @GetMapping("{userId}")
-    public ResponseEntity<List<ResponseDevice>> getDevice(@PathVariable Long userId) {
+    // 특정 유저의 디바이스 연결 상태 목록 조회
+    @GetMapping("/{userId}/devices")
+    public ResponseEntity<List<ResponseDevice>> getDevices(@PathVariable Long userId) {
 
-        List<ResponseDevice> deviceStatus = deviceService.getDeviceStatus(userId);
+        List<ResponseDevice> deviceStatuses = deviceService.getDeviceStatus(userId);
 
-        return ResponseEntity.ok(deviceStatus);
+        return ResponseEntity.ok(deviceStatuses);
     }
 
 }

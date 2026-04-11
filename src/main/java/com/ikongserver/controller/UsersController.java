@@ -18,11 +18,10 @@ public class UsersController {
     private final UserService userService;
 
     // 메인 화면 이름 및 상태 표시
-    @GetMapping("/{userId}")
-    public ResponseEntity<UserDto.MainProfileResponse> getUsers(@PathVariable Long userId) {
+    @GetMapping("/{userId}/main")
+    public ResponseEntity<UserDto.MainProfileResponse> getUser(@PathVariable Long userId) {
 
         MainProfileResponse response = userService.getMainProfile(userId);
-
         return ResponseEntity.ok(response);
 
     }

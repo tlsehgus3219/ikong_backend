@@ -2,9 +2,7 @@ package com.ikongserver.service;
 
 import com.ikongserver.dto.DeviceDto;
 import com.ikongserver.entity.Device;
-import com.ikongserver.entity.Vital;
 import com.ikongserver.repository.DeviceRepository;
-import com.ikongserver.repository.VitalRepository;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -18,10 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class DeviceService {
 
     private final DeviceRepository deviceRepository;
-    private final VitalRepository vitalRepository;
 
     // 디바이스 조회
-    // 디바이스는 2개
     public List<DeviceDto.ResponseDevice> getDeviceStatus(Long userId) {
 
         List<Device> devices = deviceRepository.findAllByUserId(userId);
@@ -31,11 +27,10 @@ public class DeviceService {
         }
 
         return devices.stream().map(device -> {
-            boolean isConnected = checkConnection(device.getId());
+            boolean isConnected = checkConnection(device.getLastConnectedAt());
 
             return new DeviceDto.ResponseDevice(
                 device.getId(),
-                device.getDeviceType(),
                 isConnected,
                 device.getSerialNum()
             );
@@ -44,19 +39,19 @@ public class DeviceService {
     }
 
     // 디바이스 연결 조회
-    private boolean checkConnection(Long deviceId) {
-        Vital lastVital = vitalRepository.findTopByDeviceOrderByRecordedAtDesc(deviceId);
-
-        if (lastVital == null) {
-            return false;
+    private boolean checkConnection(LocalDateTime lastConnectedAt) {
+        if (lastConnectedAt == null) {
+            return false; // 한 번도 데이터가 들어온 적이 없으면 연결 안 됨
         }
-
-        long minAgo = ChronoUnit.MINUTES.between(lastVital.getRecordedAt(), LocalDateTime.now());
-        return minAgo < 5;
+        // 마지막 연결 시간과 현재 시간의 차이를 계산
+        long minAgo = ChronoUnit.MINUTES.between(lastConnectedAt, LocalDateTime.now());
+        return minAgo < 5; // 5분 이내에 데이터가 들어왔으면 true(연결됨)
     }
 
     // TODO: 디바이스 다시 연결 시도
-    // 디바이스 연결 시도는 db에 기록이 남아야함
+    // 디바이스 연결 시도는 db에 기록이 남아야함 - DB 수정 필요 (연결 시간)
+    //라즈베리 파이 기기 쪽에서 코드를 짤 때 "데이터 전송 실패 시 10초 뒤 재시도" 로직만 넣어주면 알아서 재연결 처리가 됩니다.
+
 
 
 }

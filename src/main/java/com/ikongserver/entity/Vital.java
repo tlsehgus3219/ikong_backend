@@ -40,7 +40,7 @@ public class Vital {
 
     private int heartRate;
     private int breathRate;
-    private int movement;
+    private boolean isPresent;
 
     @CreationTimestamp
     @Column(updatable = false)
@@ -48,12 +48,12 @@ public class Vital {
 
 
     @Builder
-    public Vital (Users user, Device device, int heartRate, int breathRate, int movement) {
+    public Vital(Users user, Device device, int heartRate, int breathRate, boolean isPresent) {
         this.user = user;
         this.device = device;
         this.heartRate = heartRate;
         this.breathRate = breathRate;
-        this.movement = movement;
+        this.isPresent = isPresent;
     }
 
 }
