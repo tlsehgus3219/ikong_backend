@@ -11,6 +11,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -18,7 +19,7 @@ import org.hibernate.annotations.CreationTimestamp;
 
 @Entity
 @Getter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "emergency_event")
 public class EmergencyEvent {
 
@@ -40,14 +41,14 @@ public class EmergencyEvent {
 
     @CreationTimestamp
     @Column(updatable = false)
-    private LocalDateTime detectedAt;
+    private LocalDateTime createdAt;
 
     public void updateStatus(String status) {
         this.status = status;
     }
 
     @Builder
-    public EmergencyEvent(Users user, Device device, String eventType, String status) {
+    public EmergencyEvent(Users user, Device device,String eventType, String status) {
         this.user = user;
         this.device = device;
         this.eventType = eventType;

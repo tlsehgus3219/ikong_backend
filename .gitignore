@@ -52,5 +52,6 @@ application-prod.properties
 *.log
 logs/
 
-### 클로드 ai ###
+### Claude AI ###
 .claude/
+claude.md

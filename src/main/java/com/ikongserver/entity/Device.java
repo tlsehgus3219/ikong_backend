@@ -10,13 +10,16 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
 @Getter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "device")
 public class Device {
 
@@ -29,22 +32,23 @@ public class Device {
     @JoinColumn(name = "user_id")
     private Users user;
 
-    private String deviceType;
-
-    @Column(unique = true)
+    @Column(unique = true, nullable = false)
     private String serialNum;
-    private String locationNm;
+    private LocalDateTime lastConnectedAt;
 
-    public void updateLocationNm(String locationNm) {
-        this.locationNm = locationNm;
+    public void updateLastConnectedAt() {
+        if (this.lastConnectedAt == null ||
+            ChronoUnit.MINUTES.between(this.lastConnectedAt, LocalDateTime.now()) >= 1) {
+
+            this.lastConnectedAt = LocalDateTime.now();
+        }
     }
 
     @Builder
-    public Device(Users user, String deviceType, String serialNum, String locationNm) {
+    public Device(Users user, String serialNum) {
         this.user = user;
-        this.deviceType = deviceType;
         this.serialNum = serialNum;
-        this.locationNm = locationNm;
+        this.lastConnectedAt = LocalDateTime.now();
     }
 
 }
