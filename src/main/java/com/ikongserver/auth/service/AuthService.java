@@ -53,7 +53,8 @@ public class AuthService {
 
     @Transactional
     public LoginResponse kakaoLogin(KakaoLoginRequest request) {
-        String socialId = kakaoAuthService.getKakaoSocialId(request.getKakaoAccessToken());
+        KakaoAuthService.KakaoUserInfo kakaoUser = kakaoAuthService.getKakaoUserInfo(request.getKakaoAccessToken());
+        String socialId = kakaoUser.getSocialId();
         String userType = request.getUserType();
 
         boolean isNewUser = false;
@@ -66,7 +67,8 @@ public class AuthService {
                         isNew[0] = true;
                         return guardianRepository.save(Guardian.builder()
                                 .socialId(socialId)
-                                .name("보호자")
+                                .name(kakaoUser.getName() != null ? kakaoUser.getName() : "보호자")
+                                .phone(kakaoUser.getPhone())
                                 .build());
                     });
             id = String.valueOf(guardian.getId());
@@ -78,9 +80,15 @@ public class AuthService {
                         isNew[0] = true;
                         return usersRepository.save(Users.builder()
                                 .socialId(socialId)
-                                .name("사용자")
+                                .name(kakaoUser.getName() != null ? kakaoUser.getName() : "사용자")
+                                .phone(kakaoUser.getPhone())
+                                .birthDate(kakaoUser.getBirthDate())
                                 .build());
                     });
+            // 기존 유저도 카카오 정보 업데이트
+            if (!isNew[0]) {
+                user.updateFromKakao(kakaoUser.getName(), kakaoUser.getPhone(), kakaoUser.getBirthDate());
+            }
             id = String.valueOf(user.getId());
             isNewUser = isNew[0];
         }

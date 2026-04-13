@@ -54,6 +54,12 @@ public class Users {
         this.birthDate = birthDate;
     }
 
+    public void updateFromKakao(String name, String phone, LocalDate birthDate) {
+        if (name != null) this.name = name;
+        if (phone != null) this.phone = phone;
+        if (birthDate != null) this.birthDate = birthDate;
+    }
+
     @Builder
     public Users(String email, String password, String name, String phone, LocalDate birthDate, String socialId) {
         this.email = email;
