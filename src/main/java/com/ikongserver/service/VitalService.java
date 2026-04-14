@@ -5,7 +5,7 @@ import com.ikongserver.entity.Device;
 import com.ikongserver.entity.Users;
 import com.ikongserver.entity.Vital;
 import com.ikongserver.repository.DeviceRepository;
-import com.ikongserver.repository.UserRepository;
+import com.ikongserver.repository.UsersRepository;
 import com.ikongserver.repository.VitalRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

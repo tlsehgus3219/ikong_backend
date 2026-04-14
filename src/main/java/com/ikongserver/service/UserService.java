@@ -3,7 +3,7 @@ package com.ikongserver.service;
 import com.ikongserver.dto.UserDto;
 import com.ikongserver.entity.Users;
 import com.ikongserver.repository.EmergencyEventRepository;
-import com.ikongserver.repository.UserRepository;
+import com.ikongserver.repository.UsersRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class UserService {
 
-    private final UserRepository userRepository;
+    private final UsersRepository userRepository;
     private final EmergencyEventRepository emergencyEventRepository;
 
     public UserDto.MainProfileResponse getMainProfile(Long userId) {
