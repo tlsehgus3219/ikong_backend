@@ -55,3 +55,6 @@ logs/
 ### Claude AI ###
 .claude/
 claude.md
+
+### VSCode History ###
+.history/

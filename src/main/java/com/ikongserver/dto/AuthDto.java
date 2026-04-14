@@ -1,68 +1,20 @@
 package com.ikongserver.dto;
 
 import java.time.LocalDate;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 public class AuthDto {
 
-    @Getter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class SignupRequest {
-        private String email;
-        private String password;
-        private String name;
-        private String phone;
-        private LocalDate birthDate; // 선택
-    }
+    public record SignupRequest(String email, String password, String name, String phone, LocalDate birthDate) {}
 
-    @Getter
-    @Builder
-    public static class SignupResponse {
-        private Long userId;
-        private String email;
-        private String name;
-    }
+    public record SignupResponse(Long userId, String email, String name) {}
 
-    @Getter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class KakaoLoginRequest {
-        private String kakaoAccessToken;
-        private String userType; // USER | GUARDIAN
-    }
+    public record KakaoLoginRequest(String kakaoAccessToken, String userType) {}
 
-    @Getter
-    @Builder
-    public static class LoginResponse {
-        private String accessToken;
-        private String refreshToken;
-        private String tokenType;
-        private long expiresIn;
-        private boolean isNewUser;
-    }
+    public record LoginResponse(String accessToken, String refreshToken, String tokenType, long expiresIn, boolean isNewUser) {}
 
-    @Getter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class RefreshRequest {
-        private String refreshToken;
-    }
+    public record RefreshRequest(String refreshToken) {}
 
-    @Getter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class LogoutRequest {
-        private String refreshToken;
-    }
+    public record LogoutRequest(String refreshToken) {}
 
-    @Getter
-    @Builder
-    public static class RefreshResponse {
-        private String accessToken;
-        private long expiresIn;
-    }
+    public record RefreshResponse(String accessToken, long expiresIn) {}
 }
