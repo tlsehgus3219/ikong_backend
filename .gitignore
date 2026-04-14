@@ -1,0 +1,60 @@
+HELP.md
+.gradle
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/
+
+### Security & Properties (매우 중요) ###
+# DB 비밀번호, 소셜 로그인 API 키 등 민감한 정보가 담긴 환경별 설정 파일 제외
+application-dev.properties
+application-main.properties
+application-prod.properties
+*secret*.properties
+
+### OS ###
+# Mac OS를 사용하실 경우 자동으로 생기는 불필요한 숨김 파일 제외
+.DS_Store
+
+### Logs ###
+# 스프링부트 서버 실행 시 생성되는 로그 파일 제외
+*.log
+logs/
+
+### Claude AI ###
+.claude/
+claude.md
+
+### VSCode History ###
+.history/
