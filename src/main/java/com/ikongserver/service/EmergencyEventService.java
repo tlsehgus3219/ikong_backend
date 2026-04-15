@@ -6,7 +6,7 @@ import com.ikongserver.entity.Device;
 import com.ikongserver.entity.EmergencyEvent;
 import com.ikongserver.entity.Users;
 import com.ikongserver.repository.EmergencyEventRepository;
-import com.ikongserver.repository.UserRepository;
+import com.ikongserver.repository.UsersRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class EmergencyEventService {
 
     private final EmergencyEventRepository emergencyEventRepository;
-    private final UserRepository userRepository;
+    private final UsersRepository userRepository;
 
     // 낙상 감지시 프론트에 낙상 감지 보내기
     // 낙상 감지시 데이터를 Emergency_Event 테이블에 DB 저장 Type은 낙상
