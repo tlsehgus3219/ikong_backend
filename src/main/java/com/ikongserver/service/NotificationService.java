@@ -58,7 +58,7 @@ public class NotificationService {
         return new NotificationListResponse(
                 result.getTotalElements(),
                 result.getContent().stream()
-                        .map(n -> (NotificationItem) new NotificationItem(
+                        .map(n -> new NotificationItem(
                                 n.getId(),
                                 n.getMessage(),
                                 n.getStatus(),

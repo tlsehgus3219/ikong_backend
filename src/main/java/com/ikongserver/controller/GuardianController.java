@@ -1,6 +1,6 @@
 package com.ikongserver.controller;
 
-import com.ikongserver.common.ApiResponse;
+import com.ikongserver.dto.ApiResponse;
 import com.ikongserver.dto.GuardianDto;
 import com.ikongserver.service.GuardianService;
 import java.util.List;
