@@ -49,7 +49,8 @@ public class Vital {
 
 
     @Builder
-    public Vital(Users user, Device device, int heartRate, int breathRate,boolean isFallDetected ,boolean isPresent) {
+    public Vital(Users user, Device device, int heartRate, int breathRate, boolean isFallDetected,
+        boolean isPresent) {
         this.user = user;
         this.device = device;
         this.heartRate = heartRate;
