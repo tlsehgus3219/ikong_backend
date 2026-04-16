@@ -40,6 +40,7 @@ public class Vital {
 
     private int heartRate;
     private int breathRate;
+    private boolean isFallDetected;
     private boolean isPresent;
 
     @CreationTimestamp
@@ -48,11 +49,12 @@ public class Vital {
 
 
     @Builder
-    public Vital(Users user, Device device, int heartRate, int breathRate, boolean isPresent) {
+    public Vital(Users user, Device device, int heartRate, int breathRate,boolean isFallDetected ,boolean isPresent) {
         this.user = user;
         this.device = device;
         this.heartRate = heartRate;
         this.breathRate = breathRate;
+        this.isFallDetected = isFallDetected;
         this.isPresent = isPresent;
     }
 

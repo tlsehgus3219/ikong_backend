@@ -3,6 +3,7 @@ package com.ikongserver.controller;
 import com.ikongserver.dto.DeviceDto.ResponseDevice;
 import com.ikongserver.service.DeviceService;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,11 +18,11 @@ public class DeviceController {
 
     private final DeviceService deviceService;
 
-    // 특정 유저의 디바이스 연결 상태 목록 조회
+    // 특정 유저의 디바이스(라즈베리파이) 연결 상태 조회
     @GetMapping("/{userId}/devices")
-    public ResponseEntity<List<ResponseDevice>> getDevices(@PathVariable Long userId) {
+    public ResponseEntity<ResponseDevice> getDevices(@PathVariable Long userId) {
 
-        List<ResponseDevice> deviceStatuses = deviceService.getDeviceStatus(userId);
+        ResponseDevice deviceStatuses = deviceService.getDeviceStatus(userId);
 
         return ResponseEntity.ok(deviceStatuses);
     }
