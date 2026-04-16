@@ -1,6 +1,6 @@
 package com.ikongserver.service;
 
-import com.ikongserver.dto.UserDto;
+import com.ikongserver.dto.UserDto.MainProfileResponse;
 import com.ikongserver.entity.Users;
 import com.ikongserver.repository.EmergencyEventRepository;
 import com.ikongserver.repository.UsersRepository;
@@ -16,7 +16,7 @@ public class UserService {
     private final UsersRepository userRepository;
     private final EmergencyEventRepository emergencyEventRepository;
 
-    public UserDto.MainProfileResponse getMainProfile(Long userId) {
+    public MainProfileResponse getMainProfile(Long userId) {
 
         // 피보호자 아이디 조회 및 예외 처리
         Users user = userRepository.findById(userId)
@@ -27,7 +27,7 @@ public class UserService {
 
         String currentStatus = hasEmergency ? "위험" : "정상";
 
-        return new UserDto.MainProfileResponse(
+        return new MainProfileResponse(
             user.getId(),
             user.getName(),
             currentStatus
