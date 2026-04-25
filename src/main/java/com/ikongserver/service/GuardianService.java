@@ -2,8 +2,10 @@ package com.ikongserver.service;
 
 import com.ikongserver.dto.GuardianDto;
 import com.ikongserver.entity.Guardian;
+import com.ikongserver.entity.GuardianInvitation;
 import com.ikongserver.entity.UserGuardianMap;
 import com.ikongserver.entity.Users;
+import com.ikongserver.repository.GuardianInvitationRepository;
 import com.ikongserver.repository.GuardianRepository;
 import com.ikongserver.repository.UserGuardianMapRepository;
 import com.ikongserver.repository.UsersRepository;
@@ -20,6 +22,7 @@ public class GuardianService {
     private static final int MAX_GUARDIAN_COUNT = 5;
 
     private final GuardianRepository guardianRepository;
+    private final GuardianInvitationRepository guardianInvitationRepository;
     private final UserGuardianMapRepository userGuardianMapRepository;
     private final UsersRepository usersRepository;
 
@@ -75,6 +78,31 @@ public class GuardianService {
                 mapping.getRelation()
             ))
             .toList();
+    }
+
+    @Transactional
+    public GuardianDto.ResponseInvite inviteGuardian(Long userId, GuardianDto.RequestInvite request) {
+        Users user = usersRepository.findById(userId)
+            .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
+        GuardianInvitation invitation = GuardianInvitation.builder()
+            .user(user)
+            .phone(request.phone())
+            .name(request.name())
+            .relation(request.relation())
+            .isPrimary(request.isPrimary())
+            .build();
+        guardianInvitationRepository.save(invitation);
+
+        return new GuardianDto.ResponseInvite(
+            invitation.getId(),
+            invitation.getName(),
+            invitation.getPhone(),
+            invitation.getRelation(),
+            invitation.getIsPrimary(),
+            invitation.getStatus(),
+            invitation.getCreatedAt()
+        );
     }
 
     @Transactional

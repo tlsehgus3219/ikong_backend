@@ -1,5 +1,7 @@
 package com.ikongserver.dto;
 
+import java.time.LocalDateTime;
+
 public class GuardianDto {
 
     // 등록된 보호자 (피보호자 화면)
@@ -14,5 +16,14 @@ public class GuardianDto {
     // 보호자 등록 응답
     public record ResponseRegister(Long guardianId, String name, String phone, String relation,
                                    boolean isPrimary, boolean isActive) {
+    }
+
+    // 보호자 초대 요청
+    public record RequestInvite(String name, String phone, String relation, boolean isPrimary) {
+    }
+
+    // 보호자 초대 응답
+    public record ResponseInvite(Long invitationId, String name, String phone, String relation,
+                                 boolean isPrimary, String status, LocalDateTime createdAt) {
     }
 }

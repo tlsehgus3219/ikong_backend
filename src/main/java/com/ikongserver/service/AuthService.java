@@ -8,14 +8,19 @@ import com.ikongserver.dto.AuthDto.RefreshResponse;
 import com.ikongserver.dto.AuthDto.SignupRequest;
 import com.ikongserver.dto.AuthDto.SignupResponse;
 import com.ikongserver.entity.Guardian;
+import com.ikongserver.entity.GuardianInvitation;
 import com.ikongserver.entity.LogoutToken;
+import com.ikongserver.entity.UserGuardianMap;
 import com.ikongserver.entity.Users;
 import com.ikongserver.jwt.JwtUtil;
+import com.ikongserver.repository.GuardianInvitationRepository;
 import com.ikongserver.repository.GuardianRepository;
 import com.ikongserver.repository.LogoutTokenRepository;
+import com.ikongserver.repository.UserGuardianMapRepository;
 import com.ikongserver.repository.UsersRepository;
 import io.jsonwebtoken.Claims;
 import java.time.LocalDateTime;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,9 +29,13 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AuthService {
 
+    private static final int MAX_GUARDIAN_COUNT = 5;
+
     private final KakaoAuthService kakaoAuthService;
     private final UsersRepository usersRepository;
     private final GuardianRepository guardianRepository;
+    private final GuardianInvitationRepository guardianInvitationRepository;
+    private final UserGuardianMapRepository userGuardianMapRepository;
     private final LogoutTokenRepository logoutTokenRepository;
     private final JwtUtil jwtUtil;
 
@@ -67,6 +76,33 @@ public class AuthService {
                                 .phone(kakaoUser.phone())
                                 .build());
                     });
+
+            // 전화번호로 PENDING 초대 확인 및 자동 수락 (신규/기존 보호자 모두)
+            if (kakaoUser.phone() != null) {
+                List<GuardianInvitation> pendingInvitations =
+                        guardianInvitationRepository.findByPhoneAndStatus(kakaoUser.phone(), "PENDING");
+
+                for (GuardianInvitation invitation : pendingInvitations) {
+                    Users invitingUser = invitation.getUser();
+                    boolean alreadyMapped = userGuardianMapRepository
+                            .existsByUserAndGuardian(invitingUser, guardian);
+                    if (!alreadyMapped) {
+                        long activeCount = userGuardianMapRepository
+                                .countByUserAndIsActive(invitingUser, "Y");
+                        if (activeCount < MAX_GUARDIAN_COUNT) {
+                            userGuardianMapRepository.save(UserGuardianMap.builder()
+                                    .user(invitingUser)
+                                    .guardian(guardian)
+                                    .relation(invitation.getRelation())
+                                    .isPrimary(invitation.getIsPrimary() ? "Y" : "N")
+                                    .isActive("Y")
+                                    .build());
+                        }
+                    }
+                    invitation.accept();
+                }
+            }
+
             id = String.valueOf(guardian.getId());
             isNewUser = isNew[0];
         } else {

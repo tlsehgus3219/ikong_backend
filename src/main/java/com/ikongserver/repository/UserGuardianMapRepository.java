@@ -1,5 +1,6 @@
 package com.ikongserver.repository;
 
+import com.ikongserver.entity.Guardian;
 import com.ikongserver.entity.UserGuardianMap;
 import com.ikongserver.entity.Users;
 import java.util.List;
@@ -10,4 +11,6 @@ public interface UserGuardianMapRepository extends JpaRepository<UserGuardianMap
     List<UserGuardianMap> findByUser(Users user);
 
     long countByUserAndIsActive(Users user, String isActive);
+
+    boolean existsByUserAndGuardian(Users user, Guardian guardian);
 }

@@ -68,6 +68,30 @@ public class NotificationService {
         );
     }
 
+    public NotificationListResponse getNotificationsByUserId(Long userId, String status, int page, int size) {
+        Page<Notification> result;
+
+        if (status != null && !status.isEmpty()) {
+            result = notificationRepository.findByUserIdAndStatus(
+                    userId, status, PageRequest.of(page - 1, size));
+        } else {
+            result = notificationRepository.findByUserId(
+                    userId, PageRequest.of(page - 1, size));
+        }
+
+        return new NotificationListResponse(
+                result.getTotalElements(),
+                result.getContent().stream()
+                        .map(n -> new NotificationItem(
+                                n.getId(),
+                                n.getMessage(),
+                                n.getStatus(),
+                                n.getSentAt(),
+                                n.getReadYN()))
+                        .toList()
+        );
+    }
+
     @Transactional
     public void markAsRead(Long notificationId) {
         Notification notification = notificationRepository.findById(notificationId)
