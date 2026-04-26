@@ -37,15 +37,18 @@ public class NotificationController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
 
+        Long id = Long.parseLong(userDetails.getUsername());
+
         boolean isGuardian = userDetails.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_GUARDIAN"));
 
-        if (!isGuardian) {
-            return ResponseEntity.status(403).build();
+        if (isGuardian) {
+            // 보호자: guardianId 기준으로 알림 조회
+            return ResponseEntity.ok(notificationService.getNotifications(id, status, page, size));
+        } else {
+            // 피보호자: userId 기준으로 연결된 응급 이벤트의 알림 조회
+            return ResponseEntity.ok(notificationService.getNotificationsByUserId(id, status, page, size));
         }
-
-        Long guardianId = Long.parseLong(userDetails.getUsername());
-        return ResponseEntity.ok(notificationService.getNotifications(guardianId, status, page, size));
     }
 
     @PatchMapping("/{notificationId}/read")
