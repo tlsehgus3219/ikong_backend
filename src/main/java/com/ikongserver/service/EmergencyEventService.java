@@ -92,6 +92,8 @@ public class EmergencyEventService {
             .map(UserGuardianMap::getUser)
             .toList();
 
+        if (users.isEmpty()) return new EventSummaryResponse(0, 0);
+
         long unresolvedCount = emergencyEventRepository.countByUserInAndStatus(users, "PENDING");
         long resolvedCount = emergencyEventRepository.countByUserInAndStatus(users, "RESOLVED");
 
@@ -107,6 +109,8 @@ public class EmergencyEventService {
         List<Users> users = userGuardianMapRepository.findByGuardian(guardian).stream()
             .map(UserGuardianMap::getUser)
             .toList();
+
+        if (users.isEmpty()) return new EmergencyAlertListResponse(List.of());
 
         List<EmergencyAlertResponse> alerts = emergencyEventRepository
             .findByUserInOrderByCreatedAtDesc(users).stream()
@@ -140,6 +144,8 @@ public class EmergencyEventService {
         List<Users> users = userGuardianMapRepository.findByGuardian(guardian).stream()
             .map(UserGuardianMap::getUser)
             .toList();
+
+        if (users.isEmpty()) return;
 
         emergencyEventRepository.findByUserInAndStatus(users, "PENDING")
             .forEach(event -> event.updateStatus("RESOLVED"));

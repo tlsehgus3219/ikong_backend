@@ -49,10 +49,16 @@ public class GuardianInvitation {
     private LocalDateTime createdAt;
 
     public void accept() {
+        if (!"PENDING".equals(this.status)) {
+            throw new IllegalStateException("이미 처리된 초대입니다.");
+        }
         this.status = "ACCEPTED";
     }
 
     public void reject() {
+        if (!"PENDING".equals(this.status)) {
+            throw new IllegalStateException("이미 처리된 초대입니다.");
+        }
         this.status = "REJECTED";
     }
 
