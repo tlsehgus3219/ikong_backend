@@ -4,8 +4,11 @@ import com.ikongserver.dto.EventDto.ResponseEvent;
 import com.ikongserver.dto.VitalDto.VitalRequestDto;
 import com.ikongserver.entity.Device;
 import com.ikongserver.entity.EmergencyEvent;
+import com.ikongserver.entity.Guardian;
 import com.ikongserver.entity.Users;
 import com.ikongserver.repository.EmergencyEventRepository;
+import com.ikongserver.repository.GuardianRepository;
+import com.ikongserver.repository.UserGuardianMapRepository;
 import com.ikongserver.repository.UsersRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,6 +20,8 @@ public class EmergencyEventService {
 
     private final EmergencyEventRepository emergencyEventRepository;
     private final UsersRepository userRepository;
+    private final GuardianRepository guardianRepository;
+    private final UserGuardianMapRepository userGuardianMapRepository;
 
     // 낙상 감지시 프론트에 낙상 감지 보내기
     // 낙상 감지시 데이터를 Emergency_Event 테이블에 DB 저장 Type은 낙상
@@ -70,6 +75,40 @@ public class EmergencyEventService {
         }
 
         return isIssueDetected;
+    }
+
+    /**
+     * 보호자가 응급 이벤트 1건을 해결 처리.
+     * - 본인이 담당하는 피보호자의 이벤트만 해결 가능
+     * - 이미 RESOLVED 상태인 경우 멱등하게 그대로 반환
+     */
+    @Transactional
+    public ResponseEvent resolveEvent(Long guardianId, Long eventId) {
+        Guardian guardian = guardianRepository.findById(guardianId)
+            .orElseThrow(() -> new IllegalArgumentException("보호자를 찾을 수 없습니다."));
+
+        EmergencyEvent event = emergencyEventRepository.findById(eventId)
+            .orElseThrow(() -> new IllegalArgumentException("응급 이벤트를 찾을 수 없습니다."));
+
+        // 권한 체크: 보호자가 해당 피보호자를 담당하고 있는지 확인
+        boolean authorized = userGuardianMapRepository
+            .findByGuardianAndIsActive(guardian, "Y").stream()
+            .anyMatch(m -> m.getUser().getId().equals(event.getUser().getId()));
+
+        if (!authorized) {
+            throw new IllegalStateException("해당 이벤트를 해결할 권한이 없습니다.");
+        }
+
+        if (!"RESOLVED".equals(event.getStatus())) {
+            event.updateStatus("RESOLVED");
+        }
+
+        return new ResponseEvent(
+            event.getId(),
+            event.getEventType(),
+            event.getStatus(),
+            event.getCreatedAt()
+        );
     }
 
     // 응급 상황 중 미해결 조회
