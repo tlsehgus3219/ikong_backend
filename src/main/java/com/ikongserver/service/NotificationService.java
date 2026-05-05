@@ -44,6 +44,7 @@ public class NotificationService {
         return new CreateNotificationResponse(notification.getId(), notification.getMessage(), notification.getSentAt());
     }
 
+    @Transactional(readOnly = true)
     public NotificationListResponse getNotifications(Long guardianId, String status, int page, int size) {
         Page<Notification> result;
 
@@ -60,6 +61,8 @@ public class NotificationService {
                 result.getContent().stream()
                         .map(n -> new NotificationItem(
                                 n.getId(),
+                                n.getEmergencyEvent().getUser().getName(),
+                                n.getEmergencyEvent().getEventType(),
                                 n.getMessage(),
                                 n.getStatus(),
                                 n.getSentAt(),
@@ -68,6 +71,7 @@ public class NotificationService {
         );
     }
 
+    @Transactional(readOnly = true)
     public NotificationListResponse getNotificationsByUserId(Long userId, String status, int page, int size) {
         Page<Notification> result;
 
@@ -84,12 +88,18 @@ public class NotificationService {
                 result.getContent().stream()
                         .map(n -> new NotificationItem(
                                 n.getId(),
+                                n.getEmergencyEvent().getUser().getName(),
+                                n.getEmergencyEvent().getEventType(),
                                 n.getMessage(),
                                 n.getStatus(),
                                 n.getSentAt(),
                                 n.getReadYN()))
                         .toList()
         );
+    }
+
+    public long getUnreadCount(Long guardianId) {
+        return notificationRepository.countByGuardianIdAndReadYN(guardianId, "N");
     }
 
     @Transactional

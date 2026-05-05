@@ -106,6 +106,20 @@ public class GuardianService {
     }
 
     @Transactional
+    public void acceptInvitation(Long invitationId) {
+        GuardianInvitation invitation = guardianInvitationRepository.findById(invitationId)
+            .orElseThrow(() -> new IllegalArgumentException("초대를 찾을 수 없습니다."));
+        invitation.accept();
+    }
+
+    @Transactional
+    public void rejectInvitation(Long invitationId) {
+        GuardianInvitation invitation = guardianInvitationRepository.findById(invitationId)
+            .orElseThrow(() -> new IllegalArgumentException("초대를 찾을 수 없습니다."));
+        invitation.reject();
+    }
+
+    @Transactional
     public void deleteGuardian(Long userId, Long guardianId) {
         Users user = usersRepository.findById(userId)
             .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));

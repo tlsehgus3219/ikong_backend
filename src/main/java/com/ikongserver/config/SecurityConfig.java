@@ -31,6 +31,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/logout").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/notifications").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/notifications").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/notifications/unread-count").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/emergency_event/summary").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/emergency_event/alerts").authenticated()
+                        .requestMatchers(HttpMethod.PATCH, "/api/emergency_event/resolve-all").authenticated()
                         .anyRequest().permitAll())
                 .addFilterBefore(new JwtAuthenticationFilter(jwtUtil),
                         UsernamePasswordAuthenticationFilter.class);

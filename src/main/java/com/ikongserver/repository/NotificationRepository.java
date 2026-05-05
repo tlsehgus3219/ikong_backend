@@ -19,4 +19,6 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 
     @Query("SELECT n FROM Notification n WHERE n.emergencyEvent.user.id = :userId AND n.status = :status")
     Page<Notification> findByUserIdAndStatus(@Param("userId") Long userId, @Param("status") String status, Pageable pageable);
+
+    long countByGuardianIdAndReadYN(Long guardianId, String readYN);
 }

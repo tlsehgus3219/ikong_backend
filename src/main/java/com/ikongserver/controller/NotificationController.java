@@ -51,6 +51,13 @@ public class NotificationController {
         }
     }
 
+    @GetMapping("/unread-count")
+    public ResponseEntity<Long> getUnreadCount(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        Long guardianId = Long.parseLong(userDetails.getUsername());
+        return ResponseEntity.ok(notificationService.getUnreadCount(guardianId));
+    }
+
     @PatchMapping("/{notificationId}/read")
     public ResponseEntity<Void> markAsRead(@PathVariable Long notificationId) {
         notificationService.markAsRead(notificationId);

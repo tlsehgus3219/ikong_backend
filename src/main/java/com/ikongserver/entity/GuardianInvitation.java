@@ -52,6 +52,10 @@ public class GuardianInvitation {
         this.status = "ACCEPTED";
     }
 
+    public void reject() {
+        this.status = "REJECTED";
+    }
+
     @Builder
     public GuardianInvitation(Users user, String phone, String name, String relation, Boolean isPrimary) {
         this.user = user;

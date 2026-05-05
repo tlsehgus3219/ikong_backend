@@ -10,6 +10,8 @@ public interface UserGuardianMapRepository extends JpaRepository<UserGuardianMap
 
     List<UserGuardianMap> findByUser(Users user);
 
+    List<UserGuardianMap> findByGuardian(Guardian guardian);
+
     long countByUserAndIsActive(Users user, String isActive);
 
     boolean existsByUserAndGuardian(Users user, Guardian guardian);
