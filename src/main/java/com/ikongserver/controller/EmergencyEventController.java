@@ -14,6 +14,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 응급 이벤트 API 컨트롤러
+ * - 피보호자 앱: 본인의 미해결 이벤트 조회
+ * - 보호자 앱: 이벤트 요약, 목록 조회, 해결 처리
+ */
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/emergency_event")
@@ -21,14 +26,14 @@ public class EmergencyEventController {
 
     private final EmergencyEventService emergencyEventService;
 
-    // 응급 이슈 프론트 전달
+    // [피보호자용] 본인의 가장 최근 미처리(PENDING) 응급 이벤트 1건 반환 — 앱 화면에 팝업 표시용
     @GetMapping("{userId}/emergency")
     public ResponseEntity<ResponseEvent> getLatestEmergencyEvent(@PathVariable Long userId) {
         ResponseEvent response = emergencyEventService.getLatestPendingEvent(userId);
         return ResponseEntity.ok(response);
     }
 
-    // 보호자 기준 해결건/미해결건 요약
+    // [보호자용] 담당 피보호자 전체의 해결된 이벤트 수 / 미해결 이벤트 수 요약 반환
     @GetMapping("/summary")
     public ResponseEntity<EventSummaryResponse> getEventSummary(
         @AuthenticationPrincipal UserDetails userDetails) {
@@ -36,7 +41,7 @@ public class EmergencyEventController {
         return ResponseEntity.ok(emergencyEventService.getEventSummaryForGuardian(guardianId));
     }
 
-    // 보호자 기준 긴급 알림 목록
+    // [보호자용] 담당 피보호자 전체의 응급 이벤트 목록을 최신순으로 반환
     @GetMapping("/alerts")
     public ResponseEntity<EmergencyAlertListResponse> getEmergencyAlerts(
         @AuthenticationPrincipal UserDetails userDetails) {
@@ -44,7 +49,7 @@ public class EmergencyEventController {
         return ResponseEntity.ok(emergencyEventService.getEmergencyAlertsForGuardian(guardianId));
     }
 
-    // 개별 이벤트 해결 처리
+    // [보호자용] 특정 이벤트를 RESOLVED로 변경 — 권한 없는 보호자가 처리하면 403 반환
     @PatchMapping("/{eventId}/resolve")
     public ResponseEntity<ResponseEvent> resolveEvent(
         @AuthenticationPrincipal UserDetails userDetails,
@@ -53,7 +58,7 @@ public class EmergencyEventController {
         return ResponseEntity.ok(emergencyEventService.resolveEvent(guardianId, eventId));
     }
 
-    // 보호자 기준 전체 이벤트 해결 처리
+    // [보호자용] 담당 피보호자의 미해결(PENDING) 이벤트 전체를 한 번에 RESOLVED 처리
     @PatchMapping("/resolve-all")
     public ResponseEntity<Void> resolveAllEvents(
         @AuthenticationPrincipal UserDetails userDetails) {

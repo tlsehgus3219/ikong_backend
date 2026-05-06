@@ -24,6 +24,7 @@ public class NotificationService {
     private final EmergencyEventRepository emergencyEventRepository;
     private final GuardianRepository guardianRepository;
 
+    // 응급 이벤트와 연결된 알림 생성 — status 미입력 시 기본값 "SUCCESS" 저장
     @Transactional
     public CreateNotificationResponse createNotification(CreateNotificationRequest request) {
         EmergencyEvent event = emergencyEventRepository.findById(request.eventId())
@@ -44,6 +45,7 @@ public class NotificationService {
         return new CreateNotificationResponse(notification.getId(), notification.getMessage(), notification.getSentAt());
     }
 
+    // 보호자 ID 기준 알림 목록 조회 — status 파라미터가 있으면 상태 필터 적용, 없으면 전체 반환 (페이징)
     @Transactional(readOnly = true)
     public NotificationListResponse getNotifications(Long guardianId, String status, int page, int size) {
         Page<Notification> result;
@@ -71,6 +73,7 @@ public class NotificationService {
         );
     }
 
+    // 피보호자 ID 기준 알림 목록 조회 — 본인과 연결된 응급 이벤트의 알림만 반환 (페이징)
     @Transactional(readOnly = true)
     public NotificationListResponse getNotificationsByUserId(Long userId, String status, int page, int size) {
         Page<Notification> result;
@@ -98,10 +101,12 @@ public class NotificationService {
         );
     }
 
+    // 보호자의 읽지 않은 알림 수 반환
     public long getUnreadCount(Long guardianId) {
         return notificationRepository.countByGuardianIdAndReadYN(guardianId, "N");
     }
 
+    // 특정 알림을 읽음 처리 — JPA dirty checking으로 별도 save() 없이 DB 반영
     @Transactional
     public void markAsRead(Long notificationId) {
         Notification notification = notificationRepository.findById(notificationId)

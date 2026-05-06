@@ -48,6 +48,7 @@ public class GuardianInvitation {
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
+    // 초대 수락 — 이미 수락/거절된 초대를 중복 처리하지 않도록 PENDING 상태일 때만 허용
     public void accept() {
         if (!"PENDING".equals(this.status)) {
             throw new IllegalStateException("이미 처리된 초대입니다.");
@@ -55,6 +56,7 @@ public class GuardianInvitation {
         this.status = "ACCEPTED";
     }
 
+    // 초대 거절 — 이미 수락/거절된 초대를 중복 처리하지 않도록 PENDING 상태일 때만 허용
     public void reject() {
         if (!"PENDING".equals(this.status)) {
             throw new IllegalStateException("이미 처리된 초대입니다.");

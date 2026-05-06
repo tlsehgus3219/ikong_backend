@@ -28,6 +28,7 @@ public class EmergencyEventService {
     private final GuardianRepository guardianRepository;
     private final UserGuardianMapRepository userGuardianMapRepository;
 
+    // 낙상 감지 여부 확인 — isFallDetected=true면 FALL 이벤트 저장 후 true 반환 (VitalService에서 호출)
     public boolean checkFallEvent(VitalRequestDto vitalDto, Users user, Device device) {
         if (vitalDto.isFallDetected()) {
             EmergencyEvent fallEvent = EmergencyEvent.builder()
@@ -42,6 +43,7 @@ public class EmergencyEventService {
         return false;
     }
 
+    // 심박수(60~120 정상) / 호흡수(10~30 정상) 이상 여부 확인 — 범위 초과 시 각각 이벤트 저장
     public boolean checkHeartBreathEvent(VitalRequestDto vitalDto, Users user, Device device) {
         boolean isIssueDetected = false;
 
@@ -70,7 +72,7 @@ public class EmergencyEventService {
         return isIssueDetected;
     }
 
-    // 보호자 기준 해결건/미해결건 요약
+    // 보호자 ID로 담당 피보호자 전체의 해결/미해결 이벤트 수를 집계하여 반환
     @Transactional(readOnly = true)
     public EventSummaryResponse getEventSummaryForGuardian(Long guardianId) {
         Guardian guardian = guardianRepository.findById(guardianId)
@@ -88,7 +90,7 @@ public class EmergencyEventService {
         return new EventSummaryResponse(resolvedCount, unresolvedCount);
     }
 
-    // 보호자 기준 긴급 알림 목록
+    // 보호자 ID로 담당 피보호자 전체의 응급 이벤트 목록을 최신순으로 조회 (이벤트 타입별 상세 설명 포함)
     @Transactional(readOnly = true)
     public EmergencyAlertListResponse getEmergencyAlertsForGuardian(Long guardianId) {
         Guardian guardian = guardianRepository.findById(guardianId)
@@ -115,7 +117,7 @@ public class EmergencyEventService {
         return new EmergencyAlertListResponse(alerts);
     }
 
-    // 개별 이벤트 해결 처리 (권한 체크 포함)
+    // 특정 이벤트를 RESOLVED로 변경 — 해당 보호자가 담당하는 피보호자의 이벤트인지 권한 검증 후 처리
     @Transactional
     public ResponseEvent resolveEvent(Long guardianId, Long eventId) {
         Guardian guardian = guardianRepository.findById(guardianId)
@@ -139,7 +141,7 @@ public class EmergencyEventService {
         return new ResponseEvent(event.getId(), event.getEventType(), event.getStatus(), event.getCreatedAt());
     }
 
-    // 보호자 기준 전체 이벤트 해결 처리
+    // 보호자 ID로 담당 피보호자 전체의 PENDING 이벤트를 한 번에 RESOLVED로 일괄 처리
     @Transactional
     public void resolveAllEvents(Long guardianId) {
         Guardian guardian = guardianRepository.findById(guardianId)
@@ -164,7 +166,7 @@ public class EmergencyEventService {
         };
     }
 
-    // 응급 상황 중 미해결 조회
+    // 피보호자 ID로 가장 최근 PENDING 이벤트 1건 조회 — 없으면 null 반환 (앱 팝업 표시 여부 판단용)
     @Transactional(readOnly = true)
     public ResponseEvent getLatestPendingEvent(long userId) {
         Users user = userRepository.findById(userId)
