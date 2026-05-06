@@ -10,4 +10,7 @@ public interface EmergencyEventRepository extends JpaRepository<EmergencyEvent, 
     boolean existsByUserAndStatus(Users user, String status);
 
     Optional<EmergencyEvent> findTopByUserAndStatusOrderByCreatedAtDesc(Users user, String status);
+
+    // 한 피보호자의 특정 상태 이벤트 개수 (예: PENDING 이벤트 건수)
+    long countByUserAndStatus(Users user, String status);
 }

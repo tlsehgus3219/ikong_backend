@@ -31,6 +31,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/logout").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/notifications").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/notifications").authenticated()
+                        .requestMatchers("/api/v1/guardians/me/**").hasRole("GUARDIAN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/emergency_event/*/resolve").hasRole("GUARDIAN")
                         .anyRequest().permitAll())
                 .addFilterBefore(new JwtAuthenticationFilter(jwtUtil),
                         UsernamePasswordAuthenticationFilter.class);
