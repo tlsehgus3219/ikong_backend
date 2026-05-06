@@ -28,10 +28,7 @@ public class EmergencyEventService {
     private final GuardianRepository guardianRepository;
     private final UserGuardianMapRepository userGuardianMapRepository;
 
-    // 낙상 감지시 프론트에 낙상 감지 보내기
-    // 낙상 감지시 데이터를 Emergency_Event 테이블에 DB 저장 Type은 낙상
     public boolean checkFallEvent(VitalRequestDto vitalDto, Users user, Device device) {
-        // 낙상 감지
         if (vitalDto.isFallDetected()) {
             EmergencyEvent fallEvent = EmergencyEvent.builder()
                 .user(user)
@@ -41,20 +38,13 @@ public class EmergencyEventService {
                 .build();
             emergencyEventRepository.save(fallEvent);
             return true;
-
         }
         return false;
     }
 
-    // 심박수 및 호흡 이상감지 시 프론트에 심장수 및 호흡이상 감지 보내기
-    // 심박 및 호흡 이상 감지시 데이터를 Emergency_Event 테이블에 DB 저장 type은 심박수 및 호흡이상 감지
-    public boolean checkHeartBreathEvent(VitalRequestDto vitalDto, Users user,
-        Device device) {
-
+    public boolean checkHeartBreathEvent(VitalRequestDto vitalDto, Users user, Device device) {
         boolean isIssueDetected = false;
 
-        // 심박수 및 호흡 이상 감지
-        // 심박수 120 이상 , 60 이하
         if (vitalDto.heartRate() >= 120 || vitalDto.heartRate() <= 60) {
             EmergencyEvent heartEvent = EmergencyEvent.builder()
                 .user(user)
@@ -64,10 +54,8 @@ public class EmergencyEventService {
                 .build();
             emergencyEventRepository.save(heartEvent);
             isIssueDetected = true;
-
         }
 
-        // 호흡수 30 이상 , 10 이하
         if (vitalDto.breathRate() >= 30 || vitalDto.breathRate() <= 10) {
             EmergencyEvent breathEvent = EmergencyEvent.builder()
                 .user(user)
@@ -127,12 +115,28 @@ public class EmergencyEventService {
         return new EmergencyAlertListResponse(alerts);
     }
 
-    // 개별 이벤트 해결 처리
+    // 개별 이벤트 해결 처리 (권한 체크 포함)
     @Transactional
-    public void resolveEvent(Long eventId) {
+    public ResponseEvent resolveEvent(Long guardianId, Long eventId) {
+        Guardian guardian = guardianRepository.findById(guardianId)
+            .orElseThrow(() -> new IllegalArgumentException("보호자를 찾을 수 없습니다."));
+
         EmergencyEvent event = emergencyEventRepository.findById(eventId)
-            .orElseThrow(() -> new IllegalArgumentException("이벤트를 찾을 수 없습니다."));
-        event.updateStatus("RESOLVED");
+            .orElseThrow(() -> new IllegalArgumentException("응급 이벤트를 찾을 수 없습니다."));
+
+        boolean authorized = userGuardianMapRepository
+            .findByGuardianAndIsActive(guardian, "Y").stream()
+            .anyMatch(m -> m.getUser().getId().equals(event.getUser().getId()));
+
+        if (!authorized) {
+            throw new IllegalStateException("해당 이벤트를 해결할 권한이 없습니다.");
+        }
+
+        if (!"RESOLVED".equals(event.getStatus())) {
+            event.updateStatus("RESOLVED");
+        }
+
+        return new ResponseEvent(event.getId(), event.getEventType(), event.getStatus(), event.getCreatedAt());
     }
 
     // 보호자 기준 전체 이벤트 해결 처리
@@ -163,19 +167,16 @@ public class EmergencyEventService {
     // 응급 상황 중 미해결 조회
     @Transactional(readOnly = true)
     public ResponseEvent getLatestPendingEvent(long userId) {
-        // 유저 조회
         Users user = userRepository.findById(userId)
             .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
 
-        // 해당 유저의 이벤트 중 PENDING(미해결) 상태인 것을 최신순으로 1개만 조회
         return emergencyEventRepository.findTopByUserAndStatusOrderByCreatedAtDesc(user, "PENDING")
             .map(event -> new ResponseEvent(
                 event.getId(),
-                event.getEventType(), // "FALL", "HEART_ISSUE" 등
+                event.getEventType(),
                 event.getStatus(),
                 event.getCreatedAt()
             ))
-            .orElse(null); // 없으면 null 반환 (프론트에서 배너를 안 띄움)
+            .orElse(null);
     }
-
 }

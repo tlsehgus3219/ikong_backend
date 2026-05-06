@@ -35,6 +35,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/emergency_event/summary").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/emergency_event/alerts").authenticated()
                         .requestMatchers(HttpMethod.PATCH, "/api/emergency_event/resolve-all").authenticated()
+                        .requestMatchers(HttpMethod.PATCH, "/api/emergency_event/*/resolve").authenticated()
+                        .requestMatchers("/api/v1/guardians/me/**").authenticated()
                         .anyRequest().permitAll())
                 .addFilterBefore(new JwtAuthenticationFilter(jwtUtil),
                         UsernamePasswordAuthenticationFilter.class);

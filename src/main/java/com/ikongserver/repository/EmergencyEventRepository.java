@@ -17,4 +17,6 @@ public interface EmergencyEventRepository extends JpaRepository<EmergencyEvent, 
     List<EmergencyEvent> findByUserInOrderByCreatedAtDesc(List<Users> users);
 
     List<EmergencyEvent> findByUserInAndStatus(List<Users> users, String status);
+
+    long countByUserAndStatus(Users user, String status);
 }

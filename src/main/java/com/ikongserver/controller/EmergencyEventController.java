@@ -23,9 +23,7 @@ public class EmergencyEventController {
 
     // 응급 이슈 프론트 전달
     @GetMapping("{userId}/emergency")
-    public ResponseEntity<ResponseEvent> getLatestEmergencyEvent(
-        @PathVariable Long userId) {
-
+    public ResponseEntity<ResponseEvent> getLatestEmergencyEvent(@PathVariable Long userId) {
         ResponseEvent response = emergencyEventService.getLatestPendingEvent(userId);
         return ResponseEntity.ok(response);
     }
@@ -34,7 +32,6 @@ public class EmergencyEventController {
     @GetMapping("/summary")
     public ResponseEntity<EventSummaryResponse> getEventSummary(
         @AuthenticationPrincipal UserDetails userDetails) {
-
         Long guardianId = Long.parseLong(userDetails.getUsername());
         return ResponseEntity.ok(emergencyEventService.getEventSummaryForGuardian(guardianId));
     }
@@ -43,26 +40,25 @@ public class EmergencyEventController {
     @GetMapping("/alerts")
     public ResponseEntity<EmergencyAlertListResponse> getEmergencyAlerts(
         @AuthenticationPrincipal UserDetails userDetails) {
-
         Long guardianId = Long.parseLong(userDetails.getUsername());
         return ResponseEntity.ok(emergencyEventService.getEmergencyAlertsForGuardian(guardianId));
     }
 
     // 개별 이벤트 해결 처리
     @PatchMapping("/{eventId}/resolve")
-    public ResponseEntity<Void> resolveEvent(@PathVariable Long eventId) {
-        emergencyEventService.resolveEvent(eventId);
-        return ResponseEntity.ok().build();
+    public ResponseEntity<ResponseEvent> resolveEvent(
+        @AuthenticationPrincipal UserDetails userDetails,
+        @PathVariable Long eventId) {
+        Long guardianId = Long.parseLong(userDetails.getUsername());
+        return ResponseEntity.ok(emergencyEventService.resolveEvent(guardianId, eventId));
     }
 
     // 보호자 기준 전체 이벤트 해결 처리
     @PatchMapping("/resolve-all")
     public ResponseEntity<Void> resolveAllEvents(
         @AuthenticationPrincipal UserDetails userDetails) {
-
         Long guardianId = Long.parseLong(userDetails.getUsername());
         emergencyEventService.resolveAllEvents(guardianId);
         return ResponseEntity.ok().build();
     }
-
 }

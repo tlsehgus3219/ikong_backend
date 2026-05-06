@@ -15,4 +15,7 @@ public interface UserGuardianMapRepository extends JpaRepository<UserGuardianMap
     long countByUserAndIsActive(Users user, String isActive);
 
     boolean existsByUserAndGuardian(Users user, Guardian guardian);
+
+    // 보호자가 담당하는 활성 피보호자 매핑 목록
+    List<UserGuardianMap> findByGuardianAndIsActive(Guardian guardian, String isActive);
 }
