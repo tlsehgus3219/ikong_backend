@@ -1,6 +1,7 @@
 package com.ikongserver.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public class EventDto {
 
@@ -15,4 +16,21 @@ public class EventDto {
                                    Long eventId) {
 
     }
+
+    // 보호자 화면 해결건/미해결건 요약
+    public record EventSummaryResponse(long resolvedCount, long unresolvedCount) {
+
+    }
+
+    // 보호자 화면 긴급 알림 목록
+    public record EmergencyAlertResponse(
+        Long id,
+        String userName,
+        String eventType,
+        String status,
+        LocalDateTime createdAt,
+        String detail
+    ) {}
+
+    public record EmergencyAlertListResponse(List<EmergencyAlertResponse> alerts) {}
 }

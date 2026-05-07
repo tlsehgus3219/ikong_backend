@@ -1,18 +1,24 @@
 package com.ikongserver.controller;
 
-import com.ikongserver.dto.ApiResponse;
+import com.ikongserver.dto.EventDto.EmergencyAlertListResponse;
+import com.ikongserver.dto.EventDto.EventSummaryResponse;
 import com.ikongserver.dto.EventDto.ResponseEvent;
 import com.ikongserver.service.EmergencyEventService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 응급 이벤트 API 컨트롤러
+ * - 피보호자 앱: 본인의 미해결 이벤트 조회
+ * - 보호자 앱: 이벤트 요약, 목록 조회, 해결 처리
+ */
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/emergency_event")
@@ -20,41 +26,44 @@ public class EmergencyEventController {
 
     private final EmergencyEventService emergencyEventService;
 
-    // 응급 이슈 프론트 전달
+    // [피보호자용] 본인의 가장 최근 미처리(PENDING) 응급 이벤트 1건 반환 — 앱 화면에 팝업 표시용
     @GetMapping("{userId}/emergency")
-    public ResponseEntity<ResponseEvent> getLatestEmergencyEvent(
-        @PathVariable Long userId) {
-
+    public ResponseEntity<ResponseEvent> getLatestEmergencyEvent(@PathVariable Long userId) {
         ResponseEvent response = emergencyEventService.getLatestPendingEvent(userId);
-
-        // 데이터가 없으면 204 No Content를 주거나, null을 포함한 200 OK를 줍니다.
         return ResponseEntity.ok(response);
-
     }
 
-    /**
-     * 보호자가 응급 이벤트 1건을 해결 처리.
-     * 토큰의 guardianId 기준으로 권한 체크 후 status를 RESOLVED 로 변경.
-     */
+    // [보호자용] 담당 피보호자 전체의 해결된 이벤트 수 / 미해결 이벤트 수 요약 반환
+    @GetMapping("/summary")
+    public ResponseEntity<EventSummaryResponse> getEventSummary(
+        @AuthenticationPrincipal UserDetails userDetails) {
+        Long guardianId = Long.parseLong(userDetails.getUsername());
+        return ResponseEntity.ok(emergencyEventService.getEventSummaryForGuardian(guardianId));
+    }
+
+    // [보호자용] 담당 피보호자 전체의 응급 이벤트 목록을 최신순으로 반환
+    @GetMapping("/alerts")
+    public ResponseEntity<EmergencyAlertListResponse> getEmergencyAlerts(
+        @AuthenticationPrincipal UserDetails userDetails) {
+        Long guardianId = Long.parseLong(userDetails.getUsername());
+        return ResponseEntity.ok(emergencyEventService.getEmergencyAlertsForGuardian(guardianId));
+    }
+
+    // [보호자용] 특정 이벤트를 RESOLVED로 변경 — 권한 없는 보호자가 처리하면 403 반환
     @PatchMapping("/{eventId}/resolve")
-    public ResponseEntity<ApiResponse<ResponseEvent>> resolveEvent(
-        @PathVariable Long eventId
-    ) {
-        Long guardianId = currentGuardianId();
-        ResponseEvent response = emergencyEventService.resolveEvent(guardianId, eventId);
-        return ResponseEntity.ok(ApiResponse.ok("응급 이벤트가 해결 처리되었습니다.", response));
+    public ResponseEntity<ResponseEvent> resolveEvent(
+        @AuthenticationPrincipal UserDetails userDetails,
+        @PathVariable Long eventId) {
+        Long guardianId = Long.parseLong(userDetails.getUsername());
+        return ResponseEntity.ok(emergencyEventService.resolveEvent(guardianId, eventId));
     }
 
-    private Long currentGuardianId() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || auth.getName() == null) {
-            throw new IllegalStateException("인증 정보가 없습니다.");
-        }
-        try {
-            return Long.parseLong(auth.getName());
-        } catch (NumberFormatException e) {
-            throw new IllegalStateException("유효하지 않은 토큰입니다.");
-        }
+    // [보호자용] 담당 피보호자의 미해결(PENDING) 이벤트 전체를 한 번에 RESOLVED 처리
+    @PatchMapping("/resolve-all")
+    public ResponseEntity<Void> resolveAllEvents(
+        @AuthenticationPrincipal UserDetails userDetails) {
+        Long guardianId = Long.parseLong(userDetails.getUsername());
+        emergencyEventService.resolveAllEvents(guardianId);
+        return ResponseEntity.ok().build();
     }
-
 }

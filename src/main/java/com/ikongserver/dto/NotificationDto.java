@@ -9,7 +9,7 @@ public class NotificationDto {
 
     public record CreateNotificationResponse(Long notificationId, String message, LocalDateTime sentAt) {}
 
-    public record NotificationItem(Long notificationId, String message, String status, LocalDateTime sentAt, String readYN) {}
+    public record NotificationItem(Long notificationId, String userName, String eventType, String message, String status, LocalDateTime sentAt, String readYN) {}
 
     public record NotificationListResponse(long total, List<NotificationItem> notifications) {}
 }
