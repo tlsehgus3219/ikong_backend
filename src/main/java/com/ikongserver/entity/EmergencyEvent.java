@@ -47,6 +47,15 @@ public class EmergencyEvent {
         this.status = status;
     }
 
+    public String getEventDescription() {
+        return switch (this.eventType) {
+            case "FALL" -> "낙상이 감지되었습니다.";
+            case "HEART_ISSUE" -> "심박수 이상이 감지되었습니다.";
+            case "BREATH_ISSUE" -> "호흡수 이상이 감지되었습니다.";
+            default -> "이상이 감지되었습니다.";
+        };
+    }
+
     @Builder
     public EmergencyEvent(Users user, Device device,String eventType, String status) {
         this.user = user;

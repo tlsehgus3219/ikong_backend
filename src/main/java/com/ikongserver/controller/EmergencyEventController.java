@@ -3,7 +3,9 @@ package com.ikongserver.controller;
 import com.ikongserver.dto.EventDto.EmergencyAlertListResponse;
 import com.ikongserver.dto.EventDto.EventSummaryResponse;
 import com.ikongserver.dto.EventDto.ResponseEvent;
+import com.ikongserver.dto.NotificationDto.EmergencyEventDetailResponse;
 import com.ikongserver.service.EmergencyEventService;
+import com.ikongserver.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -15,9 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 응급 이벤트 API 컨트롤러
- * - 피보호자 앱: 본인의 미해결 이벤트 조회
- * - 보호자 앱: 이벤트 요약, 목록 조회, 해결 처리
+ * 응급 이벤트 API 컨트롤러 - 피보호자 앱: 본인의 미해결 이벤트 조회 - 보호자 앱: 이벤트 요약, 목록 조회, 해결 처리
  */
 @RestController
 @RequiredArgsConstructor
@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class EmergencyEventController {
 
     private final EmergencyEventService emergencyEventService;
+    private final NotificationService notificationService;
 
     // [피보호자용] 본인의 가장 최근 미처리(PENDING) 응급 이벤트 1건 반환 — 앱 화면에 팝업 표시용
     @GetMapping("{userId}/emergency")
@@ -66,4 +67,18 @@ public class EmergencyEventController {
         emergencyEventService.resolveAllEvents(guardianId);
         return ResponseEntity.ok().build();
     }
+
+    // [보호자용] 긴급 알림 디테일 상황
+    @GetMapping("{eventId}/detail")
+    public ResponseEntity<EmergencyEventDetailResponse> getEmergencyEventDetail(
+        @PathVariable Long eventId,
+        @AuthenticationPrincipal UserDetails userDetails) {
+        Long guardianId = Long.parseLong(userDetails.getUsername());
+        // 긴급 알림 디테일 데이터
+        EmergencyEventDetailResponse response = notificationService.getEmergencyEventDetail(eventId,
+            guardianId);
+        // 200 OK와 함께 DTO 반환
+        return ResponseEntity.ok(response);
+    }
+
 }

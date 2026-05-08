@@ -2,6 +2,7 @@ package com.ikongserver.repository;
 
 import com.ikongserver.entity.Vital;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -19,4 +20,6 @@ public interface VitalRepository extends JpaRepository<Vital, Long> {
         ORDER BY v.device_id, v.recorded_at DESC
         """, nativeQuery = true)
     List<Vital> findLatestVitalPerDevice(@Param("userId") Long userId);
+
+    Optional<Vital> findFirstByUserIdOrderByRecordedAtDesc(Long userId);
 }
