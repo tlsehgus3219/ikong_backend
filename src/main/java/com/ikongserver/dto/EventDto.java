@@ -7,7 +7,7 @@ public class EventDto {
 
     // 낙상 감지
     public record ResponseEvent(Long id, String eventType, String status,
-                                    LocalDateTime createdAt) {
+                                LocalDateTime createdAt) {
 
     }
 
@@ -30,7 +30,11 @@ public class EventDto {
         String status,
         LocalDateTime createdAt,
         String detail
-    ) {}
+    ) {
 
-    public record EmergencyAlertListResponse(List<EmergencyAlertResponse> alerts) {}
+    }
+
+    public record EmergencyAlertListResponse(List<EmergencyAlertResponse> alerts) {
+
+    }
 }

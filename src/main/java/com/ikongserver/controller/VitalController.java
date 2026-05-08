@@ -22,6 +22,8 @@ public class VitalController {
     private final VitalService vitalService;
     private final SseService sseService; // 프론트엔드로 데이터를 쏴줄 파이프 관리자
 
+    // todo:데이터 파이프라인(안정화 ➡️ SSE ➡️ 긴급검사 ➡️ 저장)
+
     // 라즈베리파이에서 서버로 데이터 넣기
     @PostMapping
     public ResponseEntity<String> receiveVitalData(@RequestBody VitalRequestDto vitalDto){

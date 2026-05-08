@@ -25,4 +25,6 @@ public interface EmergencyEventRepository extends JpaRepository<EmergencyEvent, 
 
     // 단일 사용자의 상태별 이벤트 수 집계
     long countByUserAndStatus(Users user, String status);
+
+    Optional<EmergencyEvent> findById(Long eventId);
 }

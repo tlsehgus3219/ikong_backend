@@ -110,9 +110,8 @@ public class EmergencyEventService {
                 event.getEventType(),
                 event.getStatus(),
                 event.getCreatedAt(),
-                toDetail(event.getEventType())
-            ))
-            .toList();
+                event.getEventDescription())
+            ).toList();
 
         return new EmergencyAlertListResponse(alerts);
     }
@@ -155,15 +154,6 @@ public class EmergencyEventService {
 
         emergencyEventRepository.findByUserInAndStatus(users, "PENDING")
             .forEach(event -> event.updateStatus("RESOLVED"));
-    }
-
-    private String toDetail(String eventType) {
-        return switch (eventType) {
-            case "FALL" -> "낙상이 감지되었습니다.";
-            case "HEART_ISSUE" -> "심박수 이상이 감지되었습니다.";
-            case "BREATH_ISSUE" -> "호흡수 이상이 감지되었습니다.";
-            default -> "이상이 감지되었습니다.";
-        };
     }
 
     // 피보호자 ID로 가장 최근 PENDING 이벤트 1건 조회 — 없으면 null 반환 (앱 팝업 표시 여부 판단용)

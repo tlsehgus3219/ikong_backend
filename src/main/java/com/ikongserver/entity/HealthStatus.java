@@ -32,18 +32,24 @@ public class HealthStatus {
     private LocalDate statDate;
 
     private int avgHeartRate;
+    private int minHeartRate;
+    private int maxHeartRate;
+    private int avgBreathRate;
     private int movementCount;
     private double sleepHours;
 
     @Builder
-    public HealthStatus(Users user, LocalDate statDate, int avgHeartRate, int movementCount,
-        int sleepHours) {
+    public HealthStatus(Users user, LocalDate statDate, int avgHeartRate,
+        int minHeartRate, int maxHeartRate, int avgBreathRate,
+        int movementCount, double sleepHours) {
         this.user = user;
         this.statDate = statDate;
         this.avgHeartRate = avgHeartRate;
+        this.minHeartRate = minHeartRate;
+        this.maxHeartRate = maxHeartRate;
+        this.avgBreathRate = avgBreathRate;
         this.movementCount = movementCount;
         this.sleepHours = sleepHours;
     }
-
 
 }
