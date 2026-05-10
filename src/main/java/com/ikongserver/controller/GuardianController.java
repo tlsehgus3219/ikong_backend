@@ -40,6 +40,27 @@ public class GuardianController {
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
+    @PostMapping("/invite")
+    public ResponseEntity<ApiResponse<GuardianDto.ResponseInvite>> inviteGuardian(
+        @RequestParam Long userId, // TODO: JWT 인증 후 SecurityContext에서 userId 추출로 변경
+        @RequestBody GuardianDto.RequestInvite request
+    ) {
+        GuardianDto.ResponseInvite response = guardianService.inviteGuardian(userId, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(response));
+    }
+
+    @PostMapping("/invite/{invitationId}/accept")
+    public ResponseEntity<ApiResponse<Void>> acceptInvitation(@PathVariable Long invitationId) {
+        guardianService.acceptInvitation(invitationId);
+        return ResponseEntity.ok(ApiResponse.ok("초대를 수락했습니다.", null));
+    }
+
+    @PostMapping("/invite/{invitationId}/reject")
+    public ResponseEntity<ApiResponse<Void>> rejectInvitation(@PathVariable Long invitationId) {
+        guardianService.rejectInvitation(invitationId);
+        return ResponseEntity.ok(ApiResponse.ok("초대를 거절했습니다.", null));
+    }
+
     @DeleteMapping("/{guardianId}")
     public ResponseEntity<ApiResponse<Void>> deleteGuardian(
         @RequestParam Long userId, // TODO: JWT 인증 후 SecurityContext에서 userId 추출로 변경

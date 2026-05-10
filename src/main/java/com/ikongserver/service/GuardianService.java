@@ -2,8 +2,10 @@ package com.ikongserver.service;
 
 import com.ikongserver.dto.GuardianDto;
 import com.ikongserver.entity.Guardian;
+import com.ikongserver.entity.GuardianInvitation;
 import com.ikongserver.entity.UserGuardianMap;
 import com.ikongserver.entity.Users;
+import com.ikongserver.repository.GuardianInvitationRepository;
 import com.ikongserver.repository.GuardianRepository;
 import com.ikongserver.repository.UserGuardianMapRepository;
 import com.ikongserver.repository.UsersRepository;
@@ -20,9 +22,11 @@ public class GuardianService {
     private static final int MAX_GUARDIAN_COUNT = 5;
 
     private final GuardianRepository guardianRepository;
+    private final GuardianInvitationRepository guardianInvitationRepository;
     private final UserGuardianMapRepository userGuardianMapRepository;
     private final UsersRepository usersRepository;
 
+    // 보호자 직접 등록 — 최대 5명 제한 초과 시 예외 발생, Guardian + UserGuardianMap 동시 생성
     @Transactional
     public GuardianDto.ResponseRegister registerGuardian(Long userId, GuardianDto.RequestRegister request) {
         Users user = usersRepository.findById(userId)
@@ -60,6 +64,7 @@ public class GuardianService {
         );
     }
 
+    // 피보호자 ID로 등록된 보호자 목록 조회 (활성/비활성 포함)
     public List<GuardianDto.ResponseGuardian> getGuardians(Long userId) {
         Users user = usersRepository.findById(userId)
             .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
@@ -77,6 +82,49 @@ public class GuardianService {
             .toList();
     }
 
+    // 보호자 초대 발송 — GuardianInvitation 레코드 생성, 초대 수락 전까지 UserGuardianMap에 반영 안 됨
+    @Transactional
+    public GuardianDto.ResponseInvite inviteGuardian(Long userId, GuardianDto.RequestInvite request) {
+        Users user = usersRepository.findById(userId)
+            .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
+        GuardianInvitation invitation = GuardianInvitation.builder()
+            .user(user)
+            .phone(request.phone())
+            .name(request.name())
+            .relation(request.relation())
+            .isPrimary(request.isPrimary())
+            .build();
+        guardianInvitationRepository.save(invitation);
+
+        return new GuardianDto.ResponseInvite(
+            invitation.getId(),
+            invitation.getName(),
+            invitation.getPhone(),
+            invitation.getRelation(),
+            invitation.getIsPrimary(),
+            invitation.getStatus(),
+            invitation.getCreatedAt()
+        );
+    }
+
+    // 초대 수락 — GuardianInvitation status를 ACCEPTED로 변경 (중복 처리 방지는 entity에서 검증)
+    @Transactional
+    public void acceptInvitation(Long invitationId) {
+        GuardianInvitation invitation = guardianInvitationRepository.findById(invitationId)
+            .orElseThrow(() -> new IllegalArgumentException("초대를 찾을 수 없습니다."));
+        invitation.accept();
+    }
+
+    // 초대 거절 — GuardianInvitation status를 REJECTED로 변경 (중복 처리 방지는 entity에서 검증)
+    @Transactional
+    public void rejectInvitation(Long invitationId) {
+        GuardianInvitation invitation = guardianInvitationRepository.findById(invitationId)
+            .orElseThrow(() -> new IllegalArgumentException("초대를 찾을 수 없습니다."));
+        invitation.reject();
+    }
+
+    // 보호자 삭제 — 실제 레코드 삭제 대신 UserGuardianMap의 isActive를 "N"으로 변경 (소프트 삭제)
     @Transactional
     public void deleteGuardian(Long userId, Long guardianId) {
         Users user = usersRepository.findById(userId)

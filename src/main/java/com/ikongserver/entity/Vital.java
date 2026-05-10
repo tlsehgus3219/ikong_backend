@@ -40,20 +40,30 @@ public class Vital {
 
     private int heartRate;
     private int breathRate;
+    private boolean isFallDetected;
     private boolean isPresent;
 
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime recordedAt;
 
+    public boolean isHeartBreathNormal() {
+        boolean isHeartNormal = (this.heartRate >= 60 && this.heartRate <= 120);
+        boolean isBreathNormal = (this.breathRate >= 10 && this.breathRate <= 30);
+
+        return isHeartNormal && isBreathNormal;
+    }
+
 
     @Builder
-    public Vital(Users user, Device device, int heartRate, int breathRate, boolean isPresent) {
+    public Vital(Users user, Device device, int heartRate, int breathRate, boolean isFallDetected,
+        boolean isPresent) {
         this.user = user;
         this.device = device;
         this.heartRate = heartRate;
         this.breathRate = breathRate;
-        this.isPresent = isPresent;
+        this.isFallDetected = isFallDetected; // 낙상 감지
+        this.isPresent = isPresent; // 활동 상태
     }
 
 }

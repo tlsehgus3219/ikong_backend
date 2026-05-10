@@ -1,6 +1,5 @@
 package com.ikongserver.controller;
 
-import com.ikongserver.dto.UserDto;
 import com.ikongserver.dto.UserDto.MainProfileResponse;
 import com.ikongserver.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +18,7 @@ public class UsersController {
 
     // 메인 화면 이름 및 상태 표시
     @GetMapping("/{userId}/main")
-    public ResponseEntity<UserDto.MainProfileResponse> getUser(@PathVariable Long userId) {
+    public ResponseEntity<MainProfileResponse> getUser(@PathVariable Long userId) {
 
         MainProfileResponse response = userService.getMainProfile(userId);
         return ResponseEntity.ok(response);

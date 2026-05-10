@@ -21,7 +21,7 @@ public class SseService {
 
     // 연결 유지 시간 (1시간)
     public SseEmitter subscribe(Long userId) {
-        // 파이브 새성
+        // 파이브 생성
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT);
 
         // map 저장
@@ -47,7 +47,6 @@ public class SseService {
     }
 
     //실제 데이터를 파이프에 밀어 넣는 공통 메서드
-
     private void sendToClient(Long userId, String eventName, Object data) {
         SseEmitter emitter = emitters.get(userId);
 

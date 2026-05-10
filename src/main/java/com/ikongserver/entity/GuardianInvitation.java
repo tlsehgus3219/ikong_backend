@@ -1,0 +1,76 @@
+package com.ikongserver.entity;
+
+import static jakarta.persistence.GenerationType.IDENTITY;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import java.time.LocalDateTime;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
+
+@Entity
+@Getter
+@NoArgsConstructor
+@Table(name = "guardian_invitation")
+public class GuardianInvitation {
+
+    @Id
+    @GeneratedValue(strategy = IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private Users user;
+
+    @Column(nullable = false)
+    private String phone;
+
+    @Column(nullable = false)
+    private String name;
+
+    @Column(nullable = false)
+    private String relation;
+
+    private Boolean isPrimary = false;
+
+    @Column(nullable = false)
+    private String status = "PENDING";
+
+    @CreationTimestamp
+    @Column(updatable = false)
+    private LocalDateTime createdAt;
+
+    // 초대 수락 — 이미 수락/거절된 초대를 중복 처리하지 않도록 PENDING 상태일 때만 허용
+    public void accept() {
+        if (!"PENDING".equals(this.status)) {
+            throw new IllegalStateException("이미 처리된 초대입니다.");
+        }
+        this.status = "ACCEPTED";
+    }
+
+    // 초대 거절 — 이미 수락/거절된 초대를 중복 처리하지 않도록 PENDING 상태일 때만 허용
+    public void reject() {
+        if (!"PENDING".equals(this.status)) {
+            throw new IllegalStateException("이미 처리된 초대입니다.");
+        }
+        this.status = "REJECTED";
+    }
+
+    @Builder
+    public GuardianInvitation(Users user, String phone, String name, String relation, Boolean isPrimary) {
+        this.user = user;
+        this.phone = phone;
+        this.name = name;
+        this.relation = relation;
+        this.isPrimary = isPrimary != null ? isPrimary : false;
+        this.status = "PENDING";
+    }
+}
