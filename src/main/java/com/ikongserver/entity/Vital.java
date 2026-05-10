@@ -63,7 +63,7 @@ public class Vital {
         this.heartRate = heartRate;
         this.breathRate = breathRate;
         this.isFallDetected = isFallDetected; // 낙상 감지
-        this.isPresent = isPresent; // 활동 상태
+        this.isPresent =  isPresent;
     }
 
 }
