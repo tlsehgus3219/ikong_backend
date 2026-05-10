@@ -26,7 +26,7 @@ public class VitalController {
 
     // 라즈베리파이에서 서버로 데이터 넣기
     @PostMapping
-    public ResponseEntity<String> receiveVitalData(@RequestBody VitalRequestDto vitalDto){
+    public ResponseEntity<String> receiveVitalData(@RequestBody VitalRequestDto vitalDto) {
 
         vitalService.getVitalData(vitalDto);
         return ResponseEntity.ok("데이터 수신 및 처리 완료");
