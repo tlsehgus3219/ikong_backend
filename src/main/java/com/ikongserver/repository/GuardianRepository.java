@@ -8,4 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface GuardianRepository extends JpaRepository<Guardian, Long> {
 
     Optional<Guardian> findBySocialId(String socialId);
+
+    Optional<Guardian> findByPhone(String phone);
 }

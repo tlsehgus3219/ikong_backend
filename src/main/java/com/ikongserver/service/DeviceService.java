@@ -19,19 +19,25 @@ public class DeviceService {
 
     private final DeviceRepository deviceRepository;
 
-    // 연결 된 디바이스(라즈베리파이) 조회
-    public ResponseDevice getDeviceStatus(Long userId) {
+    // 피보호자의 모든 센서 연결 상태 조회
+    public DeviceDto.DeviceStatusResponse getDeviceStatus(Long userId) {
+        List<Device> devices = deviceRepository.findAllByUserId(userId);
 
-        Device device = deviceRepository.findByUserId(userId)
-            .orElseThrow(() -> new IllegalArgumentException("연결 된 디바이스가 없습니다."));
+        boolean heartConnected = false;
+        boolean fallConnected = false;
 
-        boolean isConnected = checkConnection(device.getLastConnectedAt());
+        for (Device device : devices) {
+            boolean connected = checkConnection(device.getLastConnectedAt());
+            String serial = device.getSerialNum() != null ? device.getSerialNum().toUpperCase() : "";
+            if (serial.contains("FALL")) {
+                fallConnected = connected;
+            } else {
+                heartConnected = connected;
+            }
+        }
 
-        return new DeviceDto.ResponseDevice(
-            device.getId(),
-            isConnected,
-            device.getSerialNum()
-        );
+        boolean raspberryConnected = heartConnected || fallConnected;
+        return new DeviceDto.DeviceStatusResponse(raspberryConnected, heartConnected, fallConnected);
     }
 
     // 디바이스(라즈베리파이) 연결 조회
