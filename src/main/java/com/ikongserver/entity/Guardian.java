@@ -33,9 +33,15 @@ public class Guardian {
 
     private String socialId;
 
+    private String fcmToken;
+
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;
+
+    public void updateFcmToken(String fcmToken) {
+        this.fcmToken = fcmToken;
+    }
 
     public void updatePassword(String encodedPassword) {
         this.password = encodedPassword;

@@ -2,6 +2,8 @@ package com.ikongserver.controller;
 
 import com.ikongserver.dto.NotificationDto.CreateNotificationRequest;
 import com.ikongserver.dto.NotificationDto.CreateNotificationResponse;
+import com.ikongserver.dto.NotificationDto.EmergencyEventDetailResponse;
+import com.ikongserver.dto.NotificationDto.FcmTokenRequest;
 import com.ikongserver.dto.NotificationDto.NotificationListResponse;
 import com.ikongserver.service.NotificationService;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -70,6 +73,25 @@ public class NotificationController {
     @PatchMapping("/{notificationId}/read")
     public ResponseEntity<Void> markAsRead(@PathVariable Long notificationId) {
         notificationService.markAsRead(notificationId);
+        return ResponseEntity.ok().build();
+    }
+
+    // 긴급 알림 상세 조회 — 이름, 이벤트 유형, 발생 시각, 상세 내용 반환
+    @GetMapping("/events/{eventId}")
+    public ResponseEntity<EmergencyEventDetailResponse> getEmergencyEventDetail(
+            @PathVariable Long eventId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        Long guardianId = Long.parseLong(userDetails.getUsername());
+        return ResponseEntity.ok(notificationService.getEmergencyEventDetail(eventId, guardianId));
+    }
+
+    // 보호자 FCM 토큰 등록/갱신 — 앱 실행 시 최신 토큰을 서버에 저장
+    @PutMapping("/fcm-token")
+    public ResponseEntity<Void> updateFcmToken(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody FcmTokenRequest request) {
+        Long guardianId = Long.parseLong(userDetails.getUsername());
+        notificationService.updateFcmToken(guardianId, request.fcmToken());
         return ResponseEntity.ok().build();
     }
 }

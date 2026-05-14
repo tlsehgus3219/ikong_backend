@@ -38,6 +38,7 @@ public class EmergencyEvent {
 
     private String eventType;
     private String status;
+    private String severity; // WARNING(주의) or CRITICAL(심각)
 
     @CreationTimestamp
     @Column(updatable = false)
@@ -48,20 +49,24 @@ public class EmergencyEvent {
     }
 
     public String getEventDescription() {
+        String level = "CRITICAL".equals(this.severity)
+            ? "[심각] 즉시 병원 방문이 필요합니다."
+            : "[주의] 상태를 주의깊게 살펴보세요.";
         return switch (this.eventType) {
-            case "FALL" -> "낙상이 감지되었습니다.";
-            case "HEART_ISSUE" -> "심박수 이상이 감지되었습니다.";
-            case "BREATH_ISSUE" -> "호흡수 이상이 감지되었습니다.";
+            case "FALL" -> "낙상이 감지되었습니다. [심각] 즉시 확인이 필요합니다.";
+            case "HEART_ISSUE" -> "심박수 이상이 감지되었습니다. " + level;
+            case "BREATH_ISSUE" -> "호흡수 이상이 감지되었습니다. " + level;
             default -> "이상이 감지되었습니다.";
         };
     }
 
     @Builder
-    public EmergencyEvent(Users user, Device device,String eventType, String status) {
+    public EmergencyEvent(Users user, Device device, String eventType, String status, String severity) {
         this.user = user;
         this.device = device;
         this.eventType = eventType;
         this.status = status;
+        this.severity = severity;
     }
 
 }

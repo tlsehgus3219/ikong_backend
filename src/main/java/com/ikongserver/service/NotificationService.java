@@ -53,15 +53,15 @@ public class NotificationService {
             notification.getSentAt());
     }
 
-    // 보호자 ID 기준 알림 목록 조회 — status 파라미터가 있으면 상태 필터 적용, 없으면 전체 반환 (페이징)
+    // 보호자 ID 기준 알림 목록 조회 — eventStatus(PENDING/RESOLVED) 필터 지원, 없으면 전체 반환 (페이징)
     @Transactional(readOnly = true)
-    public NotificationListResponse getNotifications(Long guardianId, String status, int page,
+    public NotificationListResponse getNotifications(Long guardianId, String eventStatus, int page,
         int size) {
         Page<Notification> result;
 
-        if (status != null && !status.isEmpty()) {
-            result = notificationRepository.findByGuardianIdAndStatus(
-                guardianId, status, PageRequest.of(page - 1, size));
+        if (eventStatus != null && !eventStatus.isEmpty()) {
+            result = notificationRepository.findByGuardianIdAndEventStatus(
+                guardianId, eventStatus, PageRequest.of(page - 1, size));
         } else {
             result = notificationRepository.findByGuardianId(
                 guardianId, PageRequest.of(page - 1, size));
@@ -75,22 +75,22 @@ public class NotificationService {
                     n.getEmergencyEvent().getUser().getName(),
                     n.getEmergencyEvent().getEventType(),
                     n.getMessage(),
-                    n.getStatus(),
+                    n.getEmergencyEvent().getStatus(),
                     n.getSentAt(),
                     n.getReadYN()))
                 .toList()
         );
     }
 
-    // 피보호자 ID 기준 알림 목록 조회 — 본인과 연결된 응급 이벤트의 알림만 반환 (페이징)
+    // 피보호자 ID 기준 알림 목록 조회 — eventStatus(PENDING/RESOLVED) 필터 지원, 없으면 전체 반환 (페이징)
     @Transactional(readOnly = true)
-    public NotificationListResponse getNotificationsByUserId(Long userId, String status, int page,
+    public NotificationListResponse getNotificationsByUserId(Long userId, String eventStatus, int page,
         int size) {
         Page<Notification> result;
 
-        if (status != null && !status.isEmpty()) {
-            result = notificationRepository.findByUserIdAndStatus(
-                userId, status, PageRequest.of(page - 1, size));
+        if (eventStatus != null && !eventStatus.isEmpty()) {
+            result = notificationRepository.findByUserIdAndEventStatus(
+                userId, eventStatus, PageRequest.of(page - 1, size));
         } else {
             result = notificationRepository.findByUserId(
                 userId, PageRequest.of(page - 1, size));
@@ -104,7 +104,7 @@ public class NotificationService {
                     n.getEmergencyEvent().getUser().getName(),
                     n.getEmergencyEvent().getEventType(),
                     n.getMessage(),
-                    n.getStatus(),
+                    n.getEmergencyEvent().getStatus(),
                     n.getSentAt(),
                     n.getReadYN()))
                 .toList()
@@ -122,6 +122,14 @@ public class NotificationService {
         Notification notification = notificationRepository.findById(notificationId)
             .orElseThrow(() -> new RuntimeException("알림을 찾을 수 없습니다."));
         notification.updateReadYN("Y");
+    }
+
+    // 보호자 FCM 토큰 저장/갱신 — 앱 실행 시 최신 토큰을 서버에 등록
+    @Transactional
+    public void updateFcmToken(Long guardianId, String fcmToken) {
+        Guardian guardian = guardianRepository.findById(guardianId)
+            .orElseThrow(() -> new RuntimeException("보호자를 찾을 수 없습니다."));
+        guardian.updateFcmToken(fcmToken);
     }
 
     // 긴급 알림 디테일 상황

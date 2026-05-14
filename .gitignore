@@ -47,6 +47,11 @@ application-main.properties
 application-prod.properties
 *secret*.properties
 
+### Firebase ###
+# Firebase 서비스 계정 키 — 절대 커밋하지 않음
+src/main/resources/firebase-service-account.json
+*firebase-adminsdk*.json
+
 ### OS ###
 # Mac OS를 사용하실 경우 자동으로 생기는 불필요한 숨김 파일 제외
 .DS_Store
