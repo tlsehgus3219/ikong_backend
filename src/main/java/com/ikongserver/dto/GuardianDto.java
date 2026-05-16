@@ -9,6 +9,11 @@ public class GuardianDto {
                                    String relation) {
     }
 
+    // 보호자에게 온 대기 중인 초대
+    public record PendingInvitationResponse(Long invitationId, String wardName, String relation,
+                                            boolean isPrimary, LocalDateTime createdAt) {
+    }
+
     // 보호자 등록 요청
     public record RequestRegister(String name, String phone, String relation, boolean isPrimary) {
     }

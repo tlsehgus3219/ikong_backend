@@ -9,8 +9,9 @@ import com.ikongserver.repository.GuardianInvitationRepository;
 import com.ikongserver.repository.GuardianRepository;
 import com.ikongserver.repository.UserGuardianMapRepository;
 import com.ikongserver.repository.UsersRepository;
-import lombok.extern.slf4j.Slf4j;
+import java.util.Collections;
 import java.util.List;
+import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -121,15 +122,33 @@ public class GuardianService {
         );
     }
 
-    // 초대 수락 — GuardianInvitation status를 ACCEPTED로 변경, 피보호자에게 FCM 알림 발송
+    // 초대 수락 — status ACCEPTED로 변경 + UserGuardianMap 생성 + 피보호자에게 FCM 알림 발송
     @Transactional
     public void acceptInvitation(Long invitationId) {
         GuardianInvitation invitation = guardianInvitationRepository.findById(invitationId)
             .orElseThrow(() -> new IllegalArgumentException("초대를 찾을 수 없습니다."));
         invitation.accept();
 
+        Users user = invitation.getUser();
+        Guardian guardian = guardianRepository.findByPhone(invitation.getPhone())
+            .orElseThrow(() -> new IllegalArgumentException("보호자를 찾을 수 없습니다."));
+
+        boolean alreadyMapped = userGuardianMapRepository.existsByUserAndGuardian(user, guardian);
+        if (!alreadyMapped) {
+            long activeCount = userGuardianMapRepository.countByUserAndIsActive(user, "Y");
+            if (activeCount < MAX_GUARDIAN_COUNT) {
+                userGuardianMapRepository.save(UserGuardianMap.builder()
+                    .user(user)
+                    .guardian(guardian)
+                    .relation(invitation.getRelation())
+                    .isPrimary(invitation.getIsPrimary() ? "Y" : "N")
+                    .isActive("Y")
+                    .build());
+            }
+        }
+
         fcmService.sendPushNotification(
-            invitation.getUser().getFcmToken(),
+            user.getFcmToken(),
             "보호자 초대 수락",
             invitation.getName() + "님이 보호자 초대를 수락했습니다.",
             "ALERT"
@@ -149,6 +168,23 @@ public class GuardianService {
             invitation.getName() + "님이 보호자 초대를 거절했습니다.",
             "ALERT"
         );
+    }
+
+    public List<GuardianDto.PendingInvitationResponse> getPendingInvitations(Long guardianId) {
+        Guardian guardian = guardianRepository.findById(guardianId)
+            .orElseThrow(() -> new IllegalArgumentException("보호자를 찾을 수 없습니다."));
+        if (guardian.getPhone() == null) return Collections.emptyList();
+        return guardianInvitationRepository
+            .findByPhoneAndStatus(guardian.getPhone(), "PENDING")
+            .stream()
+            .map(inv -> new GuardianDto.PendingInvitationResponse(
+                inv.getId(),
+                inv.getUser().getName(),
+                inv.getRelation(),
+                inv.getIsPrimary(),
+                inv.getCreatedAt()
+            ))
+            .toList();
     }
 
     // 보호자 삭제 — 실제 레코드 삭제 대신 UserGuardianMap의 isActive를 "N"으로 변경 (소프트 삭제)

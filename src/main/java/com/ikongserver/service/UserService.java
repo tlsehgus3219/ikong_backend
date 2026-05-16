@@ -1,5 +1,7 @@
 package com.ikongserver.service;
 
+import com.ikongserver.dto.StatsDto.GraphPoint;
+import com.ikongserver.dto.StatsDto.VitalStatsResponse;
 import com.ikongserver.dto.UserDto.MainProfileResponse;
 import com.ikongserver.dto.UserDto.UserStateDetailResponse;
 import com.ikongserver.entity.UserGuardianMap;
@@ -9,6 +11,9 @@ import com.ikongserver.repository.EmergencyEventRepository;
 import com.ikongserver.repository.UserGuardianMapRepository;
 import com.ikongserver.repository.UsersRepository;
 import com.ikongserver.repository.VitalRepository;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -81,5 +86,59 @@ public class UserService {
             overallStatus, latestVital != null ? latestVital.getHeartRate() : 0,
             latestVital != null ? latestVital.getBreathRate() : 0,
             latestVital != null ? latestVital.getRecordedAt() : null, activityStatus);
+    }
+
+    // 생체 통계 조회 — type(HEART/BREATH) × period(TODAY/WEEK/MONTH) 조합으로 평균/최소/최대 및 그래프 데이터 반환
+    public VitalStatsResponse getVitalStats(Long userId, Long guardianId, String type, String period) {
+
+        // 보호자-피보호자 관계 검증
+        userGuardianMapRepository.findByUserIdAndGuardianId(userId, guardianId)
+            .orElseThrow(() -> new RuntimeException("권한이 없는 피보호자 입니다."));
+
+        // type과 period 조합으로 적절한 쿼리 선택
+        List<Object[]> rows = switch (type) {
+            case "HEART" -> switch (period) {
+                case "TODAY" -> vitalRepository.findHourlyHeartRateToday(userId);
+                case "WEEK"  -> vitalRepository.findDailyHeartRateThisWeek(userId);
+                case "MONTH" -> vitalRepository.findDailyHeartRateThisMonth(userId);
+                default -> throw new IllegalArgumentException("잘못된 period 값입니다: " + period);
+            };
+            case "BREATH" -> switch (period) {
+                case "TODAY" -> vitalRepository.findHourlyBreathRateToday(userId);
+                case "WEEK"  -> vitalRepository.findDailyBreathRateThisWeek(userId);
+                case "MONTH" -> vitalRepository.findDailyBreathRateThisMonth(userId);
+                default -> throw new IllegalArgumentException("잘못된 period 값입니다: " + period);
+            };
+            default -> throw new IllegalArgumentException("잘못된 type 값입니다: " + type);
+        };
+
+        // 데이터 없으면 빈 응답 반환
+        if (rows.isEmpty()) {
+            return new VitalStatsResponse(0, 0, 0, List.of(), List.of());
+        }
+
+        // 전체 평균/최소/최대 계산
+        int totalAvg = (int) rows.stream().mapToInt(r -> ((Number) r[1]).intValue()).average().orElse(0);
+        int totalMin = rows.stream().mapToInt(r -> ((Number) r[2]).intValue()).min().orElse(0);
+        int totalMax = rows.stream().mapToInt(r -> ((Number) r[3]).intValue()).max().orElse(0);
+
+        // 그래프 데이터 — 오름차순 (TODAY: "N시", WEEK/MONTH: "MM/DD" 또는 "D일")
+        List<GraphPoint> graphData = rows.stream()
+            .map(r -> new GraphPoint(formatLabel(r[0], period), ((Number) r[1]).intValue()))
+            .toList();
+
+        // 하단 목록 — 내림차순 (최신 시간이 위로)
+        List<GraphPoint> detailList = new ArrayList<>(graphData);
+        Collections.reverse(detailList);
+
+        return new VitalStatsResponse(totalAvg, totalMin, totalMax, graphData, detailList);
+    }
+
+    // TODAY: "N시" 포맷, WEEK/MONTH: 쿼리에서 이미 포맷된 문자열 그대로 사용
+    private String formatLabel(Object raw, String period) {
+        if ("TODAY".equals(period)) {
+            return ((Number) raw).intValue() + "시";
+        }
+        return raw.toString();
     }
 }

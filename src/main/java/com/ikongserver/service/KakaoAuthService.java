@@ -38,10 +38,11 @@ public class KakaoAuthService {
                 name = (String) profile.get("nickname");
             }
 
-            // 전화번호 (+82 10-xxxx-xxxx → 010-xxxx-xxxx)
+            // 전화번호 (+82 10-1234-5678 → 01012345678 숫자만)
             String rawPhone = (String) kakaoAccount.get("phone_number");
             if (rawPhone != null) {
-                phone = rawPhone.replace("+82 ", "0").replace("+82", "0");
+                phone = rawPhone.replace("+82 ", "0").replace("+82", "0")
+                        .replaceAll("[^0-9]", "");
             }
 
             // 생년 (birthyear만 수신 → YYYY-01-01)
