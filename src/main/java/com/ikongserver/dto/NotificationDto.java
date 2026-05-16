@@ -16,7 +16,7 @@ public class NotificationDto {
     }
 
     public record NotificationItem(Long notificationId, String userName, String eventType,
-                                   String message, String status, LocalDateTime sentAt,
+                                   String message, String eventStatus, LocalDateTime sentAt,
                                    String readYN) {
 
     }
@@ -30,5 +30,8 @@ public class NotificationDto {
                                                String eventType,
                                                String description, LocalDateTime occurredAt) {
 
+    }
+
+    public record FcmTokenRequest(String fcmToken) {
     }
 }
