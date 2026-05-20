@@ -127,12 +127,12 @@ public class GuardianMainService {
         // 2. 상태 판정
         String status = determineStatus(devices, latestVitals, pendingEvent.isPresent());
 
-        // 3. 화면에 보여줄 BPM 결정
+        // 3. 화면에 보여줄 BPM 결정 — 낙상 센서(heartRate=0)는 제외하고 최신 값 표시
         Integer heartRate = null;
         Integer breathRate = null;
-        if ("NORMAL".equals(status) && !latestVitals.isEmpty()) {
-            // 가장 최근의 (recordedAt 기준) vital 한 건의 값 사용
+        if (!latestVitals.isEmpty()) {
             Vital newest = latestVitals.stream()
+                .filter(v -> v.getHeartRate() > 0)
                 .max((a, b) -> a.getRecordedAt().compareTo(b.getRecordedAt()))
                 .orElse(null);
             if (newest != null) {
@@ -149,6 +149,7 @@ public class GuardianMainService {
         return new UserCard(
             user.getId(),
             user.getName(),
+            user.getPhone(),
             mapping.getRelation(),
             "Y".equals(mapping.getIsPrimary()),
             status,

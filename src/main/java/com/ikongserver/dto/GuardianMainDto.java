@@ -36,11 +36,12 @@ public class GuardianMainDto {
     public record UserCard(
         Long userId,
         String name,
+        String phone,
         String relation,
         boolean isPrimary,
         String status,
-        Integer heartRate,    // 정상 상태일 때만 값, 그 외 null
-        Integer breathRate,   // 정상 상태일 때만 값, 그 외 null
+        Integer heartRate,
+        Integer breathRate,
         LatestEvent latestEvent
     ) {
 

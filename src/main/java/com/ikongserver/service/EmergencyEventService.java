@@ -14,6 +14,7 @@ import com.ikongserver.repository.EmergencyEventRepository;
 import com.ikongserver.repository.GuardianRepository;
 import com.ikongserver.repository.UserGuardianMapRepository;
 import com.ikongserver.repository.UsersRepository;
+import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -162,7 +163,9 @@ public class EmergencyEventService {
         Users user = userRepository.findById(userId)
             .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
 
-        return emergencyEventRepository.findTopByUserAndStatusOrderByCreatedAtDesc(user, "PENDING")
+        LocalDateTime tenMinutesAgo = LocalDateTime.now().minusMinutes(10);
+        return emergencyEventRepository
+            .findTopByUserAndStatusAndCreatedAtAfterOrderByCreatedAtDesc(user, "PENDING", tenMinutesAgo)
             .map(event -> new ResponseEvent(
                 event.getId(),
                 event.getEventType(),

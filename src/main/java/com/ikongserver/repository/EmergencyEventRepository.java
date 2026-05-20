@@ -2,6 +2,7 @@ package com.ikongserver.repository;
 
 import com.ikongserver.entity.EmergencyEvent;
 import com.ikongserver.entity.Users;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -13,6 +14,10 @@ public interface EmergencyEventRepository extends JpaRepository<EmergencyEvent, 
 
     // 특정 사용자의 가장 최근 미해결 이벤트 1건 조회 (피보호자 앱 화면 표시용)
     Optional<EmergencyEvent> findTopByUserAndStatusOrderByCreatedAtDesc(Users user, String status);
+
+    // 특정 사용자의 최근 N분 이내 미해결 이벤트 1건 조회 (오래된 이벤트 상태 표시 제외용)
+    Optional<EmergencyEvent> findTopByUserAndStatusAndCreatedAtAfterOrderByCreatedAtDesc(
+        Users user, String status, LocalDateTime after);
 
     // 보호자가 담당하는 여러 피보호자의 상태별 이벤트 수 집계 (요약 화면용)
     long countByUserInAndStatus(List<Users> users, String status);
