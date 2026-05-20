@@ -41,6 +41,11 @@ public class Users {
     private LocalDateTime createdAt;
 
     private String socialId;
+    private String fcmToken;
+
+    public void updateFcmToken(String fcmToken) {
+        this.fcmToken = fcmToken;
+    }
 
     public void updatePassword(String encodedPassword) {
         this.password = encodedPassword;

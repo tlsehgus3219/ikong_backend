@@ -28,6 +28,13 @@ public class UserService {
     private final UserGuardianMapRepository userGuardianMapRepository;
     private final VitalRepository vitalRepository;
 
+    @Transactional
+    public void updateFcmToken(Long userId, String fcmToken) {
+        Users user = userRepository.findById(userId)
+            .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+        user.updateFcmToken(fcmToken);
+    }
+
     public MainProfileResponse getMainProfile(Long userId) {
 
         // 피보호자 아이디 조회 및 예외 처리

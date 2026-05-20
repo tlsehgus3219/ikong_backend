@@ -1,6 +1,8 @@
 package com.ikongserver.repository;
 
+import com.ikongserver.entity.Users;
 import com.ikongserver.entity.Vital;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -21,6 +23,11 @@ public interface VitalRepository extends JpaRepository<Vital, Long> {
     // 피보호자의 가장 최근 vital 1건 조회
     Optional<Vital> findFirstByUserIdOrderByRecordedAtDesc(Long userId);
 
+<<<<<<< HEAD
+    long countByUserAndRecordedAtAfter(Users user, LocalDateTime from);
+
+    List<Vital> findByUserAndRecordedAtAfter(Users user, LocalDateTime from);
+=======
     // [오늘] 시간별 심박수 평균/최소/최대 — 결과: [hour, avg, min, max]
     @Query(value = """
         SELECT EXTRACT(HOUR FROM recorded_at)::int AS hour,
@@ -106,4 +113,5 @@ public interface VitalRepository extends JpaRepository<Vital, Long> {
         ORDER BY DATE(recorded_at)
         """, nativeQuery = true)
     List<Object[]> findDailyBreathRateThisMonth(@Param("userId") Long userId);
+>>>>>>> origin/dev
 }

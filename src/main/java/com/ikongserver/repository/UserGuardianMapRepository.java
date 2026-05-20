@@ -24,7 +24,4 @@ public interface UserGuardianMapRepository extends JpaRepository<UserGuardianMap
     Optional<UserGuardianMap> findByUserIdAndGuardianId(Long userId, Long guardianId);
     boolean existsByUserIdAndGuardianId(Long userId, Long guardianId);
 
-    // 피보호자 보호자 관계
-    String findByUserId (Long userId);
-
 }
