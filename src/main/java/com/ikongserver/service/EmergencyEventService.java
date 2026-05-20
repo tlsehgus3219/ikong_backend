@@ -22,23 +22,30 @@ public class EmergencyEventService {
     private final UsersRepository userRepository;
     private final GuardianRepository guardianRepository;
     private final UserGuardianMapRepository userGuardianMapRepository;
+    private final NotificationService notificationService;
 
     // 낙상 감지시 프론트에 낙상 감지 보내기
     // 낙상 감지시 데이터를 Emergency_Event 테이블에 DB 저장 Type은 낙상
     public boolean checkFallEvent(VitalRequestDto vitalDto, Users user, Device device) {
-        // 낙상 감지
-        if (vitalDto.isFallDetected()) {
-            EmergencyEvent fallEvent = EmergencyEvent.builder()
-                .user(user)
-                .eventType("FALL")
-                .status("PENDING")
-                .device(device)
-                .build();
-            emergencyEventRepository.save(fallEvent);
-            return true;
-
+        if (!vitalDto.isFallDetected()) {
+            return false;
         }
-        return false;
+        // 중복 방지: 이미 PENDING 낙상 이벤트가 있으면 새로 만들지 않음
+        if (emergencyEventRepository.existsByUserAndEventTypeAndStatus(user, "FALL", "PENDING")) {
+            return false;
+        }
+
+        EmergencyEvent fallEvent = EmergencyEvent.builder()
+            .user(user)
+            .eventType("FALL")
+            .status("PENDING")
+            .device(device)
+            .build();
+        emergencyEventRepository.save(fallEvent);
+
+        // 활성 보호자 전원에게 알림 자동 생성 (1차 알림)
+        notificationService.createForEvent(fallEvent, "낙상이 감지되었습니다");
+        return true;
     }
 
     // 심박수 및 호흡 이상감지 시 프론트에 심장수 및 호흡이상 감지 보내기
@@ -48,30 +55,38 @@ public class EmergencyEventService {
 
         boolean isIssueDetected = false;
 
-        // 심박수 및 호흡 이상 감지
-        // 심박수 120 이상 , 60 이하
+        // 심박수 120 이상 또는 60 이하 (이미 PENDING 있으면 건너뜀)
         if (vitalDto.heartRate() >= 120 || vitalDto.heartRate() <= 60) {
-            EmergencyEvent heartEvent = EmergencyEvent.builder()
-                .user(user)
-                .eventType("HEART_ISSUE")
-                .status("PENDING")
-                .device(device)
-                .build();
-            emergencyEventRepository.save(heartEvent);
-            isIssueDetected = true;
+            if (!emergencyEventRepository.existsByUserAndEventTypeAndStatus(user, "HEART_ISSUE", "PENDING")) {
+                EmergencyEvent heartEvent = EmergencyEvent.builder()
+                    .user(user)
+                    .eventType("HEART_ISSUE")
+                    .status("PENDING")
+                    .device(device)
+                    .build();
+                emergencyEventRepository.save(heartEvent);
 
+                String msg = String.format("심박수 이상이 감지되었습니다 (현재 %dbpm)", vitalDto.heartRate());
+                notificationService.createForEvent(heartEvent, msg);
+                isIssueDetected = true;
+            }
         }
 
-        // 호흡수 30 이상 , 10 이하
+        // 호흡수 30 이상 또는 10 이하 (이미 PENDING 있으면 건너뜀)
         if (vitalDto.breathRate() >= 30 || vitalDto.breathRate() <= 10) {
-            EmergencyEvent breathEvent = EmergencyEvent.builder()
-                .user(user)
-                .eventType("BREATH_ISSUE")
-                .status("PENDING")
-                .device(device)
-                .build();
-            emergencyEventRepository.save(breathEvent);
-            isIssueDetected = true;
+            if (!emergencyEventRepository.existsByUserAndEventTypeAndStatus(user, "BREATH_ISSUE", "PENDING")) {
+                EmergencyEvent breathEvent = EmergencyEvent.builder()
+                    .user(user)
+                    .eventType("BREATH_ISSUE")
+                    .status("PENDING")
+                    .device(device)
+                    .build();
+                emergencyEventRepository.save(breathEvent);
+
+                String msg = String.format("호흡 이상이 감지되었습니다 (현재 %d회/분)", vitalDto.breathRate());
+                notificationService.createForEvent(breathEvent, msg);
+                isIssueDetected = true;
+            }
         }
 
         return isIssueDetected;

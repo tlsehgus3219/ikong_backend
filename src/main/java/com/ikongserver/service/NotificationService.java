@@ -7,9 +7,12 @@ import com.ikongserver.dto.NotificationDto.NotificationListResponse;
 import com.ikongserver.entity.EmergencyEvent;
 import com.ikongserver.entity.Guardian;
 import com.ikongserver.entity.Notification;
+import com.ikongserver.entity.UserGuardianMap;
 import com.ikongserver.repository.EmergencyEventRepository;
 import com.ikongserver.repository.GuardianRepository;
 import com.ikongserver.repository.NotificationRepository;
+import com.ikongserver.repository.UserGuardianMapRepository;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -23,6 +26,7 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final EmergencyEventRepository emergencyEventRepository;
     private final GuardianRepository guardianRepository;
+    private final UserGuardianMapRepository userGuardianMapRepository;
 
     @Transactional
     public CreateNotificationResponse createNotification(CreateNotificationRequest request) {
@@ -97,5 +101,29 @@ public class NotificationService {
         Notification notification = notificationRepository.findById(notificationId)
                 .orElseThrow(() -> new RuntimeException("알림을 찾을 수 없습니다."));
         notification.updateReadYN("Y");
+    }
+
+    /**
+     * 응급 이벤트에 대해 해당 피보호자의 활성 보호자 전원에게 알림 자동 생성.
+     * - EmergencyEventService 에서 이벤트 생성 직후 호출 (첫 알림)
+     * - NotificationScheduler 에서 1분마다 재알림 시에도 호출
+     */
+    @Transactional
+    public void createForEvent(EmergencyEvent event, String message) {
+        List<UserGuardianMap> mappings =
+            userGuardianMapRepository.findByUser(event.getUser()).stream()
+                .filter(m -> "Y".equals(m.getIsActive()))
+                .toList();
+
+        for (UserGuardianMap mapping : mappings) {
+            notificationRepository.save(
+                Notification.builder()
+                    .emergencyEvent(event)
+                    .guardian(mapping.getGuardian())
+                    .message(message)
+                    .status("SUCCESS")
+                    .build()
+            );
+        }
     }
 }
