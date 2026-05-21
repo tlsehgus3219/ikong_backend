@@ -2,6 +2,7 @@ package com.ikongserver.controller;
 
 import com.ikongserver.dto.EventDto.EmergencyAlertListResponse;
 import com.ikongserver.dto.EventDto.EventSummaryResponse;
+import com.ikongserver.dto.EventDto.ManualAlertRequest;
 import com.ikongserver.dto.EventDto.ResponseEvent;
 import com.ikongserver.dto.NotificationDto.EmergencyEventDetailResponse;
 import com.ikongserver.service.EmergencyEventService;
@@ -13,6 +14,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -31,6 +34,13 @@ public class EmergencyEventController {
     @GetMapping("{userId}/emergency")
     public ResponseEntity<ResponseEvent> getLatestEmergencyEvent(@PathVariable Long userId) {
         ResponseEvent response = emergencyEventService.getLatestPendingEvent(userId);
+        return ResponseEntity.ok(response);
+    }
+
+    // [라즈베리파이용] LCD [알림] 버튼 → 활성 보호자 전원에게 즉시 도움 요청 알림 발송
+    @PostMapping("/manual")
+    public ResponseEntity<ResponseEvent> createManualAlert(@RequestBody ManualAlertRequest request) {
+        ResponseEvent response = emergencyEventService.createManualAlert(request.serialNum());
         return ResponseEntity.ok(response);
     }
 

@@ -17,6 +17,11 @@ public class EventDto {
 
     }
 
+    // 라즈베리파이 LCD [알림] 버튼 → 보호자 즉시 알림 요청
+    public record ManualAlertRequest(String serialNum) {
+
+    }
+
     // 보호자 화면 해결건/미해결건 요약
     public record EventSummaryResponse(long resolvedCount, long unresolvedCount) {
 
