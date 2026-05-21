@@ -12,6 +12,7 @@ import com.ikongserver.entity.Notification;
 import com.ikongserver.entity.UserGuardianMap;
 import com.ikongserver.entity.Users;
 import com.ikongserver.entity.Vital;
+import com.ikongserver.repository.DeviceRepository;
 import com.ikongserver.repository.EmergencyEventRepository;
 import com.ikongserver.repository.GuardianRepository;
 import com.ikongserver.repository.NotificationRepository;
@@ -71,7 +72,35 @@ public class EmergencyEventService {
     private final UserGuardianMapRepository userGuardianMapRepository;
     private final NotificationRepository notificationRepository;
     private final VitalRepository vitalRepository;
+    private final DeviceRepository deviceRepository;
     private final FcmService fcmService;
+
+    /**
+     * 라즈베리파이 LCD [알림] 버튼 — 피보호자가 직접 도움 요청.
+     * 자동 감지 조건과 무관하게 무조건 emergency_event 생성 + 활성 보호자 전원에게 즉시 알림 발송.
+     * 중복 가드 없음 — 버튼을 누를 때마다 매번 새 이벤트/알림 생성.
+     */
+    @Transactional
+    public ResponseEvent createManualAlert(String serialNum) {
+        Device device = deviceRepository.findBySerialNum(serialNum)
+            .orElseThrow(() -> new IllegalArgumentException("기기를 찾을 수 없습니다."));
+        Users user = device.getUser();
+
+        EmergencyEvent event = EmergencyEvent.builder()
+            .user(user)
+            .eventType("MANUAL_ALERT")
+            .status("PENDING")
+            .severity("CRITICAL")
+            .device(device)
+            .build();
+        emergencyEventRepository.save(event);
+
+        String title = "도움 요청";
+        String message = user.getName() + "님이 도움을 요청했습니다";
+        createNotificationsAndPush(event, user, title, message);
+
+        return new ResponseEvent(event.getId(), event.getEventType(), event.getStatus(), event.getCreatedAt());
+    }
 
     // 낙상 감지 — 5분 쿨다운으로 중복 이벤트 방지, CRITICAL 이벤트 저장 + 보호자 알림 + FCM 발송
     @Transactional
