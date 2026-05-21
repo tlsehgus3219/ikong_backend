@@ -33,17 +33,13 @@ public class EmergencyEventService {
 
     // 고령자 표준 임계값 — 개인 데이터 부족 시 fallback
     private static final int ELDERLY_HR_WARN_LOW = 60, ELDERLY_HR_WARN_HIGH = 100;
-    private static final int ELDERLY_HR_CRIT_LOW = 55, ELDERLY_HR_CRIT_HIGH = 120;
     private static final int ELDERLY_BR_WARN_LOW = 12, ELDERLY_BR_WARN_HIGH = 20;
-    private static final int ELDERLY_BR_CRIT_LOW = 10, ELDERLY_BR_CRIT_HIGH = 25;
 
-    // 개인 기준선 임계 비율 — 중앙값 기준 ±15% WARNING, ±30% CRITICAL
+    // 개인 기준선 임계 비율 — 중앙값 기준 ±15% 벗어나면 이상으로 판정
     private static final double WARNING_RATIO = 0.15;
-    private static final double CRITICAL_RATIO = 0.30;
 
-    // 연속 이상 감지 기준 — 초 단위 (매초 데이터 수신 기준)
-    private static final int WARNING_CONSECUTIVE = 30;  // 30초 연속 이상
-    private static final int CRITICAL_CONSECUTIVE = 60; // 60초 연속 이상
+    // 연속 이상 감지 기준 — 30초 연속 이상부터 알림 (매초 데이터 수신 기준)
+    private static final int ABNORMAL_CONSECUTIVE = 30;
 
     // 개인 기준선 최소 데이터 수 — 3일치(25,920개) 이상이어야 신뢰 가능
     private static final long MIN_RECORDS_FOR_BASELINE = 25920L;
@@ -61,10 +57,28 @@ public class EmergencyEventService {
     private static final long FALL_COOLDOWN_MS = 5 * 60 * 1000L;
     private final Map<Long, Long> lastFallEventTimeMap = new ConcurrentHashMap<>();
 
-    // 심박수/호흡수 CRITICAL 지속 시 5분마다 재알림
-    private static final long VITAL_RECALERT_MS = 5 * 60 * 1000L;
-    private final Map<Long, Long> lastHeartEventTimeMap = new ConcurrentHashMap<>();
-    private final Map<Long, Long> lastBreathEventTimeMap = new ConcurrentHashMap<>();
+    // 심박/호흡 이상 지속 시 재알림 간격 — 1분
+    private static final long VITAL_RECALERT_MS = 60 * 1000L;
+
+    // 진행 중인 심박/호흡 이상 episode — userId별 1건
+    private final Map<Long, Episode> activeEpisodeMap = new ConcurrentHashMap<>();
+
+    // 진행 중인 이상 episode 상태 — 신규 발생/에스컬레이션/재알림 판단에 사용
+    private static class Episode {
+        final Long eventId;
+        final String severity;   // "WARNING"(한쪽 이상) | "CRITICAL"(양쪽 동시 이상)
+        final String title;
+        final String message;
+        long lastAlertTime;
+
+        Episode(Long eventId, String severity, String title, String message, long lastAlertTime) {
+            this.eventId = eventId;
+            this.severity = severity;
+            this.title = title;
+            this.message = message;
+            this.lastAlertTime = lastAlertTime;
+        }
+    }
 
     private final EmergencyEventRepository emergencyEventRepository;
     private final UsersRepository userRepository;
@@ -130,67 +144,111 @@ public class EmergencyEventService {
         return true;
     }
 
-    // 심박수/호흡수 이상 감지 — 개인 기준선(7일 중앙값) 기반, 연속 30초→WARNING / 60초→CRITICAL
+    // 심박수/호흡수 이상 감지 — 개인 기준선(7일 중앙값) 기반, 30초 연속 이상부터 알림
+    // 한쪽만 이상 → WARNING(HEART_ISSUE/BREATH_ISSUE), 양쪽 동시 이상 → CRITICAL(VITAL_ISSUE)
     // 개인 데이터 3일 미만 시 고령자 표준 임계값으로 자동 전환
     @Transactional
     public boolean checkHeartBreathEvent(VitalRequestDto vitalDto, Users user, Device device) {
-        boolean isIssueDetected = false;
         Long userId = user.getId();
         int[] baseline = getPersonalBaseline(user);
 
-        // 심박수 연속 이상 감지 — 30초 WARNING, 60초 CRITICAL, 이후 5분마다 CRITICAL 재알림
-        int hr = vitalDto.heartRate();
-        if (isAbnormal(hr, baseline, true)) {
-            int count = heartConsecutiveMap.merge(userId, 1, Integer::sum);
-            if (count == WARNING_CONSECUTIVE) {
-                String severity = isCritical(hr, baseline, true) ? "CRITICAL" : "WARNING";
-                saveHeartEvent(user, device, severity);
-                lastHeartEventTimeMap.put(userId, System.currentTimeMillis());
-                isIssueDetected = true;
-            } else if (count == CRITICAL_CONSECUTIVE) {
-                saveHeartEvent(user, device, "CRITICAL");
-                lastHeartEventTimeMap.put(userId, System.currentTimeMillis());
-                isIssueDetected = true;
-            } else if (count > CRITICAL_CONSECUTIVE) {
-                long now = System.currentTimeMillis();
-                Long lastTime = lastHeartEventTimeMap.get(userId);
-                if (lastTime == null || now - lastTime >= VITAL_RECALERT_MS) {
-                    saveHeartEvent(user, device, "CRITICAL");
-                    lastHeartEventTimeMap.put(userId, now);
-                    isIssueDetected = true;
-                }
-            }
+        // 연속 이상 카운터 갱신 — 이상이면 +1, 정상이면 0으로 리셋
+        int hrCount;
+        if (isAbnormal(vitalDto.heartRate(), baseline, true)) {
+            hrCount = heartConsecutiveMap.merge(userId, 1, Integer::sum);
         } else {
             heartConsecutiveMap.put(userId, 0);
+            hrCount = 0;
         }
-
-        // 호흡수 연속 이상 감지 — 30초 WARNING, 60초 CRITICAL, 이후 5분마다 CRITICAL 재알림
-        int br = vitalDto.breathRate();
-        if (isAbnormal(br, baseline, false)) {
-            int count = breathConsecutiveMap.merge(userId, 1, Integer::sum);
-            if (count == WARNING_CONSECUTIVE) {
-                String severity = isCritical(br, baseline, false) ? "CRITICAL" : "WARNING";
-                saveBreathEvent(user, device, severity);
-                lastBreathEventTimeMap.put(userId, System.currentTimeMillis());
-                isIssueDetected = true;
-            } else if (count == CRITICAL_CONSECUTIVE) {
-                saveBreathEvent(user, device, "CRITICAL");
-                lastBreathEventTimeMap.put(userId, System.currentTimeMillis());
-                isIssueDetected = true;
-            } else if (count > CRITICAL_CONSECUTIVE) {
-                long now = System.currentTimeMillis();
-                Long lastTime = lastBreathEventTimeMap.get(userId);
-                if (lastTime == null || now - lastTime >= VITAL_RECALERT_MS) {
-                    saveBreathEvent(user, device, "CRITICAL");
-                    lastBreathEventTimeMap.put(userId, now);
-                    isIssueDetected = true;
-                }
-            }
+        int brCount;
+        if (isAbnormal(vitalDto.breathRate(), baseline, false)) {
+            brCount = breathConsecutiveMap.merge(userId, 1, Integer::sum);
         } else {
             breathConsecutiveMap.put(userId, 0);
+            brCount = 0;
         }
 
-        return isIssueDetected;
+        boolean hrBad = hrCount >= ABNORMAL_CONSECUTIVE;
+        boolean brBad = brCount >= ABNORMAL_CONSECUTIVE;
+
+        // 이상 지표 개수로 심각도 결정 — 양쪽 동시 이상이면 CRITICAL, 한쪽만이면 WARNING
+        if (hrBad && brBad) {
+            return handleCondition(user, device, "CRITICAL", "VITAL_ISSUE");
+        } else if (hrBad) {
+            return handleCondition(user, device, "WARNING", "HEART_ISSUE");
+        } else if (brBad) {
+            return handleCondition(user, device, "WARNING", "BREATH_ISSUE");
+        }
+
+        // 양쪽 다 30초 미달 — 이상 없음, 진행 중 episode 종료
+        activeEpisodeMap.remove(userId);
+        return false;
+    }
+
+    // 이상 상태 처리 — 신규 발생/악화 시 새 이벤트+알림, 지속 시 1분마다 미확인 보호자에게만 재알림
+    private boolean handleCondition(Users user, Device device, String severity, String eventType) {
+        Long userId = user.getId();
+        Episode active = activeEpisodeMap.get(userId);
+        long now = System.currentTimeMillis();
+
+        boolean isNew = (active == null);
+        boolean isEscalation = active != null
+            && "WARNING".equals(active.severity) && "CRITICAL".equals(severity);
+
+        if (isNew || isEscalation) {
+            // 신규 발생 또는 WARNING→CRITICAL 악화 — 새 이벤트 생성 + 보호자 전원 알림
+            EmergencyEvent event = EmergencyEvent.builder()
+                .user(user).eventType(eventType).status("PENDING")
+                .severity(severity).device(device).build();
+            emergencyEventRepository.save(event);
+
+            String[] tm = buildTitleMessage(user, eventType);
+            createNotificationsAndPush(event, user, tm[0], tm[1]);
+            activeEpisodeMap.put(userId, new Episode(event.getId(), severity, tm[0], tm[1], now));
+            return true;
+        }
+
+        // 동일/완화 상태 지속 — 1분마다 아직 안 읽은 보호자에게만 FCM 재발송
+        if (now - active.lastAlertTime >= VITAL_RECALERT_MS) {
+            reAlertUnreadGuardians(active.eventId, active.title, active.message);
+            active.lastAlertTime = now;
+        }
+        return true;
+    }
+
+    // eventType별 FCM 제목/메시지 생성 — [0]=title, [1]=message
+    private String[] buildTitleMessage(Users user, String eventType) {
+        String name = user.getName();
+        return switch (eventType) {
+            case "VITAL_ISSUE" -> new String[]{
+                "[심각] 심박수·호흡수 이상",
+                name + "님의 심박수와 호흡수에 동시에 이상이 감지되었습니다. 즉시 확인이 필요합니다."};
+            case "HEART_ISSUE" -> new String[]{
+                "[주의] 심박수 이상",
+                name + "님의 심박수가 평소와 다르게 측정되고 있습니다. 상태를 주의깊게 살펴보세요."};
+            case "BREATH_ISSUE" -> new String[]{
+                "[주의] 호흡수 이상",
+                name + "님의 호흡수가 평소와 다르게 측정되고 있습니다. 상태를 주의깊게 살펴보세요."};
+            default -> new String[]{
+                "바이탈 이상", name + "님의 바이탈에 이상이 감지되었습니다."};
+        };
+    }
+
+    // 진행 중인 이벤트에 대해 아직 안 읽은(readYN=N) 보호자에게만 FCM 재발송 — 새 알림 행은 만들지 않음
+    private void reAlertUnreadGuardians(Long eventId, String title, String message) {
+        EmergencyEvent event = emergencyEventRepository.findById(eventId).orElse(null);
+        if (event == null) {
+            return;
+        }
+        userGuardianMapRepository.findByUser(event.getUser()).stream()
+            .filter(m -> "Y".equals(m.getIsActive()))
+            .map(UserGuardianMap::getGuardian)
+            .forEach(guardian ->
+                notificationRepository
+                    .findFirstByEmergencyEventIdAndGuardianIdOrderBySentAtDesc(eventId, guardian.getId())
+                    .filter(n -> "N".equals(n.getReadYN()))
+                    .ifPresent(n -> fcmService.sendPushNotification(
+                        guardian.getFcmToken(), title, message, "EMERGENCY")));
     }
 
     // 개인 기준선(중앙값) 반환 — 캐시 유효하면 재사용, 만료 시 재계산
@@ -231,47 +289,12 @@ public class EmergencyEventService {
         return value < median * (1 - WARNING_RATIO) || value > median * (1 + WARNING_RATIO);
     }
 
-    // 심각 여부 판단 — baseline null이면 고령자 표준 임계값, 있으면 개인 중앙값 ±30%
-    private boolean isCritical(int value, int[] baseline, boolean isHeart) {
-        if (baseline == null) {
-            return isHeart
-                ? (value < ELDERLY_HR_CRIT_LOW || value > ELDERLY_HR_CRIT_HIGH)
-                : (value < ELDERLY_BR_CRIT_LOW || value > ELDERLY_BR_CRIT_HIGH);
-        }
-        int median = isHeart ? baseline[0] : baseline[1];
-        return value < median * (1 - CRITICAL_RATIO) || value > median * (1 + CRITICAL_RATIO);
-    }
-
     private int calculateMedian(List<Integer> sorted) {
         int size = sorted.size();
         if (size == 0) return 0;
         return size % 2 == 0
             ? (sorted.get(size / 2 - 1) + sorted.get(size / 2)) / 2
             : sorted.get(size / 2);
-    }
-
-    private void saveHeartEvent(Users user, Device device, String severity) {
-        EmergencyEvent event = EmergencyEvent.builder()
-            .user(user).eventType("HEART_ISSUE").status("PENDING").severity(severity).device(device).build();
-        emergencyEventRepository.save(event);
-        boolean isCritical = "CRITICAL".equals(severity);
-        String title = isCritical ? "[심각] 심박수 위험" : "[주의] 심박수 이상";
-        String message = isCritical
-            ? user.getName() + "심박수가 위험 수준입니다. 즉시 확인이 필요합니다."
-            : user.getName() + "심박수가 평소와 다르게 측정되고 있습니다. 상태를 주의깊게 살펴보세요.";
-        createNotificationsAndPush(event, user, title, message);
-    }
-
-    private void saveBreathEvent(Users user, Device device, String severity) {
-        EmergencyEvent event = EmergencyEvent.builder()
-            .user(user).eventType("BREATH_ISSUE").status("PENDING").severity(severity).device(device).build();
-        emergencyEventRepository.save(event);
-        boolean isCritical = "CRITICAL".equals(severity);
-        String title = isCritical ? "[심각] 호흡수 위험" : "[주의] 호흡수 이상";
-        String message = isCritical
-            ? user.getName() + "호흡수가 위험 수준입니다. 즉시 확인이 필요합니다."
-            : user.getName() + "호흡수가 평소와 다르게 측정되고 있습니다. 상태를 주의깊게 살펴보세요.";
-        createNotificationsAndPush(event, user, title, message);
     }
 
     // 이벤트 발생 시 활성화된 모든 보호자에게 Notification 저장 + FCM 푸시 전송
