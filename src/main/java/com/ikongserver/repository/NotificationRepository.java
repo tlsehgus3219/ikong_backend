@@ -1,6 +1,7 @@
 package com.ikongserver.repository;
 
 import com.ikongserver.entity.Notification;
+import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -25,4 +26,8 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     Page<Notification> findByUserIdAndEventStatus(@Param("userId") Long userId, @Param("eventStatus") String eventStatus, Pageable pageable);
 
     long countByGuardianIdAndReadYN(Long guardianId, String readYN);
+
+    // 특정 이벤트에 대한 특정 보호자의 가장 최근 알림 1건 — 재알림 시 읽음 여부 확인용
+    Optional<Notification> findFirstByEmergencyEventIdAndGuardianIdOrderBySentAtDesc(
+        Long emergencyEventId, Long guardianId);
 }
