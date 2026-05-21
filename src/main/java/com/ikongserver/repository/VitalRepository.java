@@ -23,9 +23,6 @@ public interface VitalRepository extends JpaRepository<Vital, Long> {
     // 피보호자의 가장 최근 vital 1건 조회
     Optional<Vital> findFirstByUserIdOrderByRecordedAtDesc(Long userId);
 
-    // 개인 기준선 계산용: 기간 내 vital 개수
-    long countByUserAndRecordedAtAfter(Users user, LocalDateTime from);
-
     // 개인 기준선 계산용: 기간 내 vital 목록
     List<Vital> findByUserAndRecordedAtAfter(Users user, LocalDateTime from);
 
