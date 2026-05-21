@@ -7,6 +7,10 @@ import com.ikongserver.entity.Users;
 import com.ikongserver.entity.Vital;
 import com.ikongserver.repository.DeviceRepository;
 import com.ikongserver.repository.VitalRepository;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
@@ -39,8 +43,8 @@ public class VitalService {
         Users user = device.getUser();
 
         // 데이터 안정화 (알고리즘 필터 통과)
-        int stabilizedHR = filterNoise_HR(vitalDto.heartRate());
-        int stabilizedBR = filterNoise_BR(vitalDto.breathRate());
+        int stabilizedHR = filterNoise_HR(vitalDto.serialNum(), vitalDto.heartRate());
+        int stabilizedBR = filterNoise_BR(vitalDto.serialNum(), vitalDto.breathRate());
 
         // 긴급 상황 검사 및 상태 반환
         boolean status = false;
@@ -74,13 +78,60 @@ public class VitalService {
         }
     }
 
-    // --- 데이터 안정화 알고리즘 더미 (추후 로직 채워넣을 예정) ---
-    private int filterNoise_HR(int rawHeartRate) {
-        return rawHeartRate; // 일단 들어온 값 그대로 반환
+    // 💡 1차 검사관 (Median): 문서 명세에 따라 윈도우 사이즈 3 (약 6초 분량 데이터)
+    private static final int WINDOW_SIZE = 3;
+    private final Map<String, LinkedList<Integer>> hrWindowMap = new ConcurrentHashMap<>();
+    private final Map<String, LinkedList<Integer>> brWindowMap = new ConcurrentHashMap<>();
+
+    // 💡 2차 검사관 (EMA): 문서 권장값 (0.3 ~ 0.4 사이의 최적값 0.35 적용)
+    // 너무 낮으면(0.1) 10~20초 지연이 발생하므로 0.35가 가장 적절합니다.
+    private static final double EMA_ALPHA = 0.35;
+    private final Map<String, Integer> lastEmaHrMap = new ConcurrentHashMap<>();
+    private final Map<String, Integer> lastEmaBrMap = new ConcurrentHashMap<>();
+
+    // --- 🛠️ 명세서 기반 하이브리드 안정화 알고리즘 (Median + EMA) ---
+
+    private int filterNoise_HR(String serialNum, int rawHeartRate) {
+        return applyHybridFilter(serialNum, rawHeartRate, hrWindowMap, lastEmaHrMap);
     }
 
-    private int filterNoise_BR(int rawBreathRate) {
-        return rawBreathRate; // 일단 들어온 값 그대로 반환
+    private int filterNoise_BR(String serialNum, int rawBreathRate) {
+        return applyHybridFilter(serialNum, rawBreathRate, brWindowMap, lastEmaBrMap);
+    }
+
+    // 공통 필터 로직
+    private int applyHybridFilter(String serialNum, int rawValue,
+        Map<String, LinkedList<Integer>> windowMap,
+        Map<String, Integer> emaMap) {
+
+        // 1. 기기별 윈도우 바구니 가져오기
+        LinkedList<Integer> window = windowMap.computeIfAbsent(serialNum, k -> new LinkedList<>());
+
+        // 2. 새 데이터 추가 및 오래된 데이터 제거 (최대 3개 유지)
+        window.add(rawValue);
+        if (window.size() > WINDOW_SIZE) {
+            window.removeFirst();
+        }
+
+        // 3. 데이터가 3개 미만일 때는 초기화 과정이므로 원본 반환
+        if (window.size() < WINDOW_SIZE) {
+            emaMap.put(serialNum, rawValue);
+            return rawValue;
+        }
+
+        // 4. [Median Filter] 3개 데이터 중 중간값 추출 (Pi가 놓친 미세 스파이크 최종 방어)
+        List<Integer> sortedWindow = new ArrayList<>(window);
+        Collections.sort(sortedWindow);
+        int medianValue = sortedWindow.get(WINDOW_SIZE / 2);
+
+        // 5. [EMA Filter] 이전 평균값과 현재 중간값을 가중치(0.35)로 결합 (유일한 스무딩 단계)
+        int lastEma = emaMap.getOrDefault(serialNum, medianValue);
+        int finalSmoothedValue = (int) Math.round((medianValue * EMA_ALPHA) + (lastEma * (1.0 - EMA_ALPHA)));
+
+        // 6. 계산된 최종 값을 EMA 장부에 기록
+        emaMap.put(serialNum, finalSmoothedValue);
+
+        return finalSmoothedValue;
     }
 
 }
