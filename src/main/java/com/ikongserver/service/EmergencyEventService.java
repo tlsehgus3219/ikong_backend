@@ -19,6 +19,7 @@ import com.ikongserver.repository.NotificationRepository;
 import com.ikongserver.repository.UserGuardianMapRepository;
 import com.ikongserver.repository.UsersRepository;
 import com.ikongserver.repository.VitalRepository;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -35,14 +36,17 @@ public class EmergencyEventService {
     private static final int ELDERLY_HR_WARN_LOW = 60, ELDERLY_HR_WARN_HIGH = 100;
     private static final int ELDERLY_BR_WARN_LOW = 12, ELDERLY_BR_WARN_HIGH = 20;
 
-    // 개인 기준선 임계 비율 — 중앙값 기준 ±15% 벗어나면 이상으로 판정
+    // 개인 기준선 임계 비율 — 가중평균 기준 ±15% 벗어나면 이상으로 판정
     private static final double WARNING_RATIO = 0.15;
 
     // 연속 이상 감지 기준 — 30초 연속 이상부터 알림 (매초 데이터 수신 기준)
     private static final int ABNORMAL_CONSECUTIVE = 30;
 
-    // 개인 기준선 최소 데이터 수 — 3일치(25,920개) 이상이어야 신뢰 가능
-    private static final long MIN_RECORDS_FOR_BASELINE = 25920L;
+    // 개인 기준선 계산 윈도우 — 최근 N일 데이터만 사용
+    private static final int BASELINE_WINDOW_DAYS = 7;
+
+    // 개인 기준선 가중치 반감기 — 데이터가 이만큼 오래될수록 가중치 절반 (1일)
+    private static final long BASELINE_HALF_LIFE_MS = 24 * 60 * 60 * 1000L;
 
     // 개인 기준선 캐시 — 6시간마다 재계산 (매초 DB 조회 방지)
     private static final long BASELINE_CACHE_TTL = 6 * 60 * 60 * 1000L;
@@ -251,8 +255,9 @@ public class EmergencyEventService {
                         guardian.getFcmToken(), title, message, "EMERGENCY")));
     }
 
-    // 개인 기준선(중앙값) 반환 — 캐시 유효하면 재사용, 만료 시 재계산
-    // 데이터 부족(3일 미만)이면 null 반환 → 고령자 표준 임계값 사용
+    // 개인 기준선(가중평균) 반환 — 캐시 유효하면 재사용, 만료 시 재계산
+    // 최근 데이터일수록 가중치를 크게 두는 지수 시간감쇠 가중평균으로 계산
+    // 데이터가 1건도 없으면 null 반환 → 고령자 표준 임계값 사용
     private int[] getPersonalBaseline(Users user) {
         Long userId = user.getId();
         Long lastCalc = baselineCacheTime.get(userId);
@@ -263,38 +268,42 @@ public class EmergencyEventService {
             return baselineCache.get(userId);
         }
 
-        long count = vitalRepository.countByUserAndRecordedAtAfter(user, LocalDateTime.now().minusDays(7));
-        if (count < MIN_RECORDS_FOR_BASELINE) {
+        List<Vital> vitals = vitalRepository.findByUserAndRecordedAtAfter(
+            user, LocalDateTime.now().minusDays(BASELINE_WINDOW_DAYS));
+        if (vitals.isEmpty()) {
             return null;
         }
 
-        List<Vital> vitals = vitalRepository.findByUserAndRecordedAtAfter(user, LocalDateTime.now().minusDays(7));
-        int medianHR = calculateMedian(vitals.stream().map(Vital::getHeartRate).sorted().toList());
-        int medianBR = calculateMedian(vitals.stream().map(Vital::getBreathRate).sorted().toList());
+        // 지수 시간감쇠 가중평균 — weight = 0.5^(데이터 나이 / 반감기), 오래될수록 가중치 감소
+        LocalDateTime now = LocalDateTime.now();
+        double weightSum = 0, hrWeightedSum = 0, brWeightedSum = 0;
+        for (Vital v : vitals) {
+            long ageMs = Duration.between(v.getRecordedAt(), now).toMillis();
+            double weight = Math.pow(0.5, (double) ageMs / BASELINE_HALF_LIFE_MS);
+            weightSum += weight;
+            hrWeightedSum += v.getHeartRate() * weight;
+            brWeightedSum += v.getBreathRate() * weight;
+        }
 
-        int[] baseline = {medianHR, medianBR};
+        int[] baseline = {
+            (int) Math.round(hrWeightedSum / weightSum),
+            (int) Math.round(brWeightedSum / weightSum)
+        };
         baselineCache.put(userId, baseline);
         baselineCacheTime.put(userId, System.currentTimeMillis());
         return baseline;
     }
 
-    // 이상 여부 판단 — baseline null이면 고령자 표준 임계값, 있으면 개인 중앙값 ±15%
+    // 이상 여부 판단 — baseline null이면 고령자 표준 임계값, 있으면 개인 가중평균 ±15%
     private boolean isAbnormal(int value, int[] baseline, boolean isHeart) {
         if (baseline == null) {
             return isHeart
                 ? (value < ELDERLY_HR_WARN_LOW || value > ELDERLY_HR_WARN_HIGH)
                 : (value < ELDERLY_BR_WARN_LOW || value > ELDERLY_BR_WARN_HIGH);
         }
-        int median = isHeart ? baseline[0] : baseline[1];
-        return value < median * (1 - WARNING_RATIO) || value > median * (1 + WARNING_RATIO);
-    }
-
-    private int calculateMedian(List<Integer> sorted) {
-        int size = sorted.size();
-        if (size == 0) return 0;
-        return size % 2 == 0
-            ? (sorted.get(size / 2 - 1) + sorted.get(size / 2)) / 2
-            : sorted.get(size / 2);
+        int baselineValue = isHeart ? baseline[0] : baseline[1];
+        return value < baselineValue * (1 - WARNING_RATIO)
+            || value > baselineValue * (1 + WARNING_RATIO);
     }
 
     // 이벤트 발생 시 활성화된 모든 보호자에게 Notification 저장 + FCM 푸시 전송
