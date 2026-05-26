@@ -26,6 +26,9 @@ public interface VitalRepository extends JpaRepository<Vital, Long> {
     // 개인 기준선 계산용: 기간 내 vital 목록
     List<Vital> findByUserAndRecordedAtAfter(Users user, LocalDateTime from);
 
+    // 워밍업 제외용: 피보호자의 가장 오래된 vital 10건 (recordedAt 오름차순)
+    List<Vital> findTop10ByUserOrderByRecordedAtAsc(Users user);
+
     // [오늘] 시간별 심박수 평균/최소/최대 — 결과: [hour, avg, min, max]
     @Query(value = """
         SELECT EXTRACT(HOUR FROM recorded_at)::int AS hour,

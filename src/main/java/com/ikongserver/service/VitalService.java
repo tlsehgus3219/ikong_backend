@@ -33,8 +33,10 @@ public class VitalService {
 
     @Transactional
     public void getVitalData(VitalRequestDto vitalDto) {
+        String serialNum = vitalDto.serialNum();
+
         // 라즈베리와 연결이 되어 있는지 확인
-        Device device = deviceRepository.findBySerialNum(vitalDto.serialNum())
+        Device device = deviceRepository.findBySerialNum(serialNum)
             .orElseThrow(() -> new IllegalArgumentException("기기를 찾을 수 없습니다."));
         // 매초 마다 업데이트 되는 데이터를 device 테이블 안에서는 1분마다 연결 되어 있다는 마지막 연결 시간을 업데이트 함.
         device.updateLastConnectedAt();
@@ -42,26 +44,28 @@ public class VitalService {
         // 디바이스에서 피보호자 객체 찾기
         Users user = device.getUser();
 
+        // 센서 종류 분기 — 시리얼 접두사 기준 (FALL-*: 낙상 전용 / HR-* 등: 심박·호흡 전용)
+        if (serialNum != null && serialNum.startsWith("FALL")) {
+            // 낙상 센서: 낙상 감지만 수행하고 HR/BR/SSE/저장은 건너뜀
+            emergencyEventService.checkFallEvent(vitalDto, user, device);
+            return;
+        }
+
+        // HR-* 센서 (또는 미지정 시리얼): 심박·호흡 처리만 수행, 낙상 검사는 생략
         // 데이터 안정화 (알고리즘 필터 통과)
-        int stabilizedHR = filterNoise_HR(vitalDto.serialNum(), vitalDto.heartRate());
-        int stabilizedBR = filterNoise_BR(vitalDto.serialNum(), vitalDto.breathRate());
+        int stabilizedHR = filterNoise_HR(serialNum, vitalDto.heartRate());
+        int stabilizedBR = filterNoise_BR(serialNum, vitalDto.breathRate());
 
         // 긴급 상황 검사 및 상태 반환
-        boolean status = false;
-        boolean isFallEvent = emergencyEventService.checkFallEvent(vitalDto, user, device);
         boolean isHREvent = emergencyEventService.checkHeartBreathEvent(vitalDto, user, device);
-
-        if (isFallEvent || isHREvent) {
-            status = true;
-        }
 
         // 프론트엔드로 실시간 SSE 전송
         ResponseUserVital sseData = new ResponseUserVital(user.getId(), stabilizedHR, stabilizedBR,
-            status);
+            isHREvent);
         sseService.sendVitalDataToClient(user.getId(), sseData);
 
         long currentTime = System.currentTimeMillis();
-        long lastSavedTime = lastSavedTimeMap.getOrDefault(vitalDto.serialNum(), 0L);
+        long lastSavedTime = lastSavedTimeMap.getOrDefault(serialNum, 0L);
 
         // 받은 데이터를 Vital 테이블에 저장
         if (currentTime - lastSavedTime >= 10000) {
@@ -70,11 +74,11 @@ public class VitalService {
                 .device(device)
                 .heartRate(stabilizedHR)
                 .breathRate(stabilizedBR)
-                .isFallDetected(status)
+                .isFallDetected(false) // HR 센서는 낙상 정보 없음
                 .isPresent(vitalDto.isPresent())
                 .build();
             vitalRepository.save(newVital);
-            lastSavedTimeMap.put(vitalDto.serialNum(), currentTime);
+            lastSavedTimeMap.put(serialNum, currentTime);
         }
     }
 
