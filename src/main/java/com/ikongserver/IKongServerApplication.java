@@ -16,6 +16,7 @@ public class IKongServerApplication {
     }
 
     public static void main(String[] args) {
+        TimeZone.setDefault(TimeZone.getTimeZone("Asia/Seoul"));
         SpringApplication.run(IKongServerApplication.class, args);
     }
 
