@@ -48,6 +48,13 @@ public class EmergencyEventService {
     // 개인 기준선 가중치 반감기 — 데이터가 이만큼 오래될수록 가중치 절반 (1일)
     private static final long BASELINE_HALF_LIFE_MS = 24 * 60 * 60 * 1000L;
 
+    // 워밍업 데이터 수 — 사용자 최초 N건은 기준선 계산에서 제외 (센서 초기 이상값 차단)
+    private static final int BASELINE_WARMUP_COUNT = 10;
+
+    // VITAL_ISSUE 생성 쿨다운 — 동일 시리얼 번호당 3분 (중복 응급 이벤트 방지)
+    private static final long VITAL_ANOMALY_COOLDOWN_MS = 3 * 60 * 1000L;
+    private final Map<String, Long> lastVitalAnomalyTimeMap = new ConcurrentHashMap<>();
+
     // 개인 기준선 캐시 — 6시간마다 재계산 (매초 DB 조회 방지)
     private static final long BASELINE_CACHE_TTL = 6 * 60 * 60 * 1000L;
     private final Map<Long, int[]> baselineCache = new ConcurrentHashMap<>();
@@ -176,12 +183,13 @@ public class EmergencyEventService {
         boolean brBad = brCount >= ABNORMAL_CONSECUTIVE;
 
         // 이상 지표 개수로 심각도 결정 — 양쪽 동시 이상이면 CRITICAL, 한쪽만이면 WARNING
+        String serialNum = vitalDto.serialNum();
         if (hrBad && brBad) {
-            return handleCondition(user, device, "CRITICAL", "VITAL_ISSUE");
+            return handleCondition(user, device, "CRITICAL", "VITAL_ISSUE", serialNum);
         } else if (hrBad) {
-            return handleCondition(user, device, "WARNING", "HEART_ISSUE");
+            return handleCondition(user, device, "WARNING", "HEART_ISSUE", serialNum);
         } else if (brBad) {
-            return handleCondition(user, device, "WARNING", "BREATH_ISSUE");
+            return handleCondition(user, device, "WARNING", "BREATH_ISSUE", serialNum);
         }
 
         // 양쪽 다 30초 미달 — 이상 없음, 진행 중 episode 종료
@@ -190,7 +198,9 @@ public class EmergencyEventService {
     }
 
     // 이상 상태 처리 — 신규 발생/악화 시 새 이벤트+알림, 지속 시 1분마다 미확인 보호자에게만 재알림
-    private boolean handleCondition(Users user, Device device, String severity, String eventType) {
+    // VITAL_ISSUE는 동일 시리얼 번호당 3분 쿨다운으로 중복 생성 방지
+    private boolean handleCondition(Users user, Device device, String severity, String eventType,
+        String serialNum) {
         Long userId = user.getId();
         Episode active = activeEpisodeMap.get(userId);
         long now = System.currentTimeMillis();
@@ -200,6 +210,15 @@ public class EmergencyEventService {
             && "WARNING".equals(active.severity) && "CRITICAL".equals(severity);
 
         if (isNew || isEscalation) {
+            // VITAL_ISSUE는 동일 serialNum 3분 쿨다운 적용 — 쿨다운 중이면 이벤트 생성/알림 발송 생략
+            if ("VITAL_ISSUE".equals(eventType) && serialNum != null) {
+                Long lastTime = lastVitalAnomalyTimeMap.get(serialNum);
+                if (lastTime != null && now - lastTime < VITAL_ANOMALY_COOLDOWN_MS) {
+                    return true; // 쿨다운 중 — 긴급 상태만 유지하고 새 이벤트는 만들지 않음
+                }
+                lastVitalAnomalyTimeMap.put(serialNum, now);
+            }
+
             // 신규 발생 또는 WARNING→CRITICAL 악화 — 새 이벤트 생성 + 보호자 전원 알림
             EmergencyEvent event = EmergencyEvent.builder()
                 .user(user).eventType(eventType).status("PENDING")
@@ -257,7 +276,8 @@ public class EmergencyEventService {
 
     // 개인 기준선(가중평균) 반환 — 캐시 유효하면 재사용, 만료 시 재계산
     // 최근 데이터일수록 가중치를 크게 두는 지수 시간감쇠 가중평균으로 계산
-    // 데이터가 1건도 없으면 null 반환 → 고령자 표준 임계값 사용
+    // 사용자 최초 BASELINE_WARMUP_COUNT건은 센서 초기 이상값으로 보고 계산에서 제외
+    // 워밍업 미완료(총 데이터 < N건)이거나 워밍업 이후 가용 데이터가 없으면 null 반환 → 고령자 표준 임계값 사용
     private int[] getPersonalBaseline(Users user) {
         Long userId = user.getId();
         Long lastCalc = baselineCacheTime.get(userId);
@@ -268,8 +288,18 @@ public class EmergencyEventService {
             return baselineCache.get(userId);
         }
 
-        List<Vital> vitals = vitalRepository.findByUserAndRecordedAtAfter(
+        // 워밍업: 사용자의 가장 오래된 10건의 마지막 시각을 구해 그 이전 데이터는 제외
+        List<Vital> earliest = vitalRepository.findTop10ByUserOrderByRecordedAtAsc(user);
+        if (earliest.size() < BASELINE_WARMUP_COUNT) {
+            return null; // 워밍업 단계 — 기준선 신뢰 불가, 표준값 사용
+        }
+        LocalDateTime warmupEnd = earliest.get(BASELINE_WARMUP_COUNT - 1).getRecordedAt();
+
+        List<Vital> windowVitals = vitalRepository.findByUserAndRecordedAtAfter(
             user, LocalDateTime.now().minusDays(BASELINE_WINDOW_DAYS));
+        List<Vital> vitals = windowVitals.stream()
+            .filter(v -> v.getRecordedAt().isAfter(warmupEnd))
+            .toList();
         if (vitals.isEmpty()) {
             return null;
         }
