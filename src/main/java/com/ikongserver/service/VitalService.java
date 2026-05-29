@@ -78,24 +78,38 @@ public class VitalService {
         }
     }
 
-    // 💡 1차 검사관 (Median): 문서 명세에 따라 윈도우 사이즈 3 (약 6초 분량 데이터)
-    private static final int WINDOW_SIZE = 3;
+    // 1차 필터 (Median): 윈도우 사이즈 5 (약 5초 분량 데이터)
+    private static final int WINDOW_SIZE = 5;
     private final Map<String, LinkedList<Integer>> hrWindowMap = new ConcurrentHashMap<>();
     private final Map<String, LinkedList<Integer>> brWindowMap = new ConcurrentHashMap<>();
 
-    // 💡 2차 검사관 (EMA): 문서 권장값 (0.3 ~ 0.4 사이의 최적값 0.35 적용)
-    // 너무 낮으면(0.1) 10~20초 지연이 발생하므로 0.35가 가장 적절합니다.
-    private static final double EMA_ALPHA = 0.35;
+    // 2차 필터 (EMA): alpha 0.2 — 급격한 변화 억제, 실제 추세는 반영
+    private static final double EMA_ALPHA = 0.2;
     private final Map<String, Integer> lastEmaHrMap = new ConcurrentHashMap<>();
     private final Map<String, Integer> lastEmaBrMap = new ConcurrentHashMap<>();
 
-    // --- 🛠️ 명세서 기반 하이브리드 안정화 알고리즘 (Median + EMA) ---
+    // 생리학적으로 불가능한 값은 윈도우에 넣지 않고 이전 안정화 값 유지
+    private static final int HR_MIN = 30, HR_MAX = 200;
+    private static final int BR_MIN = 8, BR_MAX = 40;
+
+    // 직전 EMA 대비 초당 20bpm 이상 급변하면 스파이크로 간주
+    private static final int HR_MAX_DELTA = 20;
 
     private int filterNoise_HR(String serialNum, int rawHeartRate) {
+        if (rawHeartRate < HR_MIN || rawHeartRate > HR_MAX) {
+            return lastEmaHrMap.getOrDefault(serialNum, rawHeartRate);
+        }
+        int currentEma = lastEmaHrMap.getOrDefault(serialNum, rawHeartRate);
+        if (Math.abs(rawHeartRate - currentEma) > HR_MAX_DELTA) {
+            return currentEma;
+        }
         return applyHybridFilter(serialNum, rawHeartRate, hrWindowMap, lastEmaHrMap);
     }
 
     private int filterNoise_BR(String serialNum, int rawBreathRate) {
+        if (rawBreathRate < BR_MIN || rawBreathRate > BR_MAX) {
+            return lastEmaBrMap.getOrDefault(serialNum, rawBreathRate);
+        }
         return applyHybridFilter(serialNum, rawBreathRate, brWindowMap, lastEmaBrMap);
     }
 
@@ -107,28 +121,23 @@ public class VitalService {
         // 1. 기기별 윈도우 바구니 가져오기
         LinkedList<Integer> window = windowMap.computeIfAbsent(serialNum, k -> new LinkedList<>());
 
-        // 2. 새 데이터 추가 및 오래된 데이터 제거 (최대 3개 유지)
         window.add(rawValue);
         if (window.size() > WINDOW_SIZE) {
             window.removeFirst();
         }
 
-        // 3. 데이터가 3개 미만일 때는 초기화 과정이므로 원본 반환
         if (window.size() < WINDOW_SIZE) {
             emaMap.put(serialNum, rawValue);
             return rawValue;
         }
 
-        // 4. [Median Filter] 3개 데이터 중 중간값 추출 (Pi가 놓친 미세 스파이크 최종 방어)
         List<Integer> sortedWindow = new ArrayList<>(window);
         Collections.sort(sortedWindow);
         int medianValue = sortedWindow.get(WINDOW_SIZE / 2);
 
-        // 5. [EMA Filter] 이전 평균값과 현재 중간값을 가중치(0.35)로 결합 (유일한 스무딩 단계)
         int lastEma = emaMap.getOrDefault(serialNum, medianValue);
         int finalSmoothedValue = (int) Math.round((medianValue * EMA_ALPHA) + (lastEma * (1.0 - EMA_ALPHA)));
 
-        // 6. 계산된 최종 값을 EMA 장부에 기록
         emaMap.put(serialNum, finalSmoothedValue);
 
         return finalSmoothedValue;
