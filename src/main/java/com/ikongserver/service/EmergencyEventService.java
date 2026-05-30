@@ -5,10 +5,12 @@ import com.ikongserver.dto.EventDto.EmergencyAlertResponse;
 import com.ikongserver.dto.EventDto.EventSummaryResponse;
 import com.ikongserver.dto.EventDto.ResponseEvent;
 import com.ikongserver.dto.VitalDto.VitalRequestDto;
+import com.ikongserver.entity.ConditionType;
 import com.ikongserver.entity.Device;
 import com.ikongserver.entity.EmergencyEvent;
 import com.ikongserver.entity.Guardian;
 import com.ikongserver.entity.Notification;
+import com.ikongserver.entity.UserCondition;
 import com.ikongserver.entity.UserGuardianMap;
 import com.ikongserver.entity.Users;
 import com.ikongserver.entity.Vital;
@@ -16,6 +18,7 @@ import com.ikongserver.repository.DeviceRepository;
 import com.ikongserver.repository.EmergencyEventRepository;
 import com.ikongserver.repository.GuardianRepository;
 import com.ikongserver.repository.NotificationRepository;
+import com.ikongserver.repository.UserConditionRepository;
 import com.ikongserver.repository.UserGuardianMapRepository;
 import com.ikongserver.repository.UsersRepository;
 import com.ikongserver.repository.VitalRepository;
@@ -98,6 +101,7 @@ public class EmergencyEventService {
     private final NotificationRepository notificationRepository;
     private final VitalRepository vitalRepository;
     private final DeviceRepository deviceRepository;
+    private final UserConditionRepository userConditionRepository;
     private final FcmService fcmService;
 
     /**
@@ -163,16 +167,21 @@ public class EmergencyEventService {
         Long userId = user.getId();
         int[] baseline = getPersonalBaseline(user);
 
+        // 질환 목록 1회 조회 — HR/BR 판정에 재사용
+        List<ConditionType> conditions = userConditionRepository.findByUser(user).stream()
+            .map(uc -> uc.getConditionType())
+            .toList();
+
         // 연속 이상 카운터 갱신 — 이상이면 +1, 정상이면 0으로 리셋
         int hrCount;
-        if (isAbnormal(vitalDto.heartRate(), baseline, true)) {
+        if (isAbnormal(vitalDto.heartRate(), baseline, true, conditions)) {
             hrCount = heartConsecutiveMap.merge(userId, 1, Integer::sum);
         } else {
             heartConsecutiveMap.put(userId, 0);
             hrCount = 0;
         }
         int brCount;
-        if (isAbnormal(vitalDto.breathRate(), baseline, false)) {
+        if (isAbnormal(vitalDto.breathRate(), baseline, false, conditions)) {
             brCount = breathConsecutiveMap.merge(userId, 1, Integer::sum);
         } else {
             breathConsecutiveMap.put(userId, 0);
@@ -324,8 +333,13 @@ public class EmergencyEventService {
         return baseline;
     }
 
-    // 이상 여부 판단 — baseline null이면 고령자 표준 임계값, 있으면 개인 가중평균 ±15%
-    private boolean isAbnormal(int value, int[] baseline, boolean isHeart) {
+    // 이상 여부 판단 — 질환 등록 시 질환별 임계값 우선 적용, 없으면 기존 가중평균 ±15% 로직
+    private boolean isAbnormal(int value, int[] baseline, boolean isHeart, List<ConditionType> conditions) {
+        if (!conditions.isEmpty()) {
+            return isAbnormalByCondition(value, baseline, isHeart, conditions);
+        }
+
+        // 질환 없음 — 기존 로직 유지
         if (baseline == null) {
             return isHeart
                 ? (value < ELDERLY_HR_WARN_LOW || value > ELDERLY_HR_WARN_HIGH)
@@ -334,6 +348,67 @@ public class EmergencyEventService {
         int baselineValue = isHeart ? baseline[0] : baseline[1];
         return value < baselineValue * (1 - WARNING_RATIO)
             || value > baselineValue * (1 + WARNING_RATIO);
+    }
+
+    // 질환별 임계값 이상 판정
+    // requireBoth=false(즉시 위험 질환: 패혈증·심근경색·뇌졸중): 임계값 초과만으로 이상 판정
+    // requireBoth=true(중간 위험 질환): 임계값 초과 AND 개인 기준선 ±15% 초과 둘 다 충족해야 이상
+    // baseline null(데이터 부족)이면 모든 질환에서 임계값만으로 판정
+    private boolean isAbnormalByCondition(int value, int[] baseline, boolean isHeart,
+        List<ConditionType> conditions) {
+
+        // Step 1 — 질환 임계값 초과 여부
+        boolean exceedsConditionThreshold = checkConditionThreshold(value, baseline, isHeart, conditions);
+
+        // Step 2 — 개인 기준선 ±15% 초과 여부
+        boolean exceedsBaseline = false;
+        if (baseline != null) {
+            int base = isHeart ? baseline[0] : baseline[1];
+            exceedsBaseline = value < base * (1 - WARNING_RATIO)
+                           || value > base * (1 + WARNING_RATIO);
+        }
+
+        // 즉시 위험 질환(requireBoth=false)이 하나라도 있으면 임계값만으로 판정
+        boolean hasImmediateDanger = conditions.stream().anyMatch(c -> !c.requireBoth);
+        if (hasImmediateDanger) {
+            return exceedsConditionThreshold;
+        }
+
+        // 모두 중간 위험 질환(requireBoth=true)이면 둘 다 초과해야 이상
+        return baseline == null
+            ? exceedsConditionThreshold
+            : exceedsConditionThreshold && exceedsBaseline;
+    }
+
+    // 질환별 절대 임계값 초과 여부 확인 — 복수 질환 선택 시 가장 민감한 기준 적용
+    private boolean checkConditionThreshold(int value, int[] baseline, boolean isHeart,
+        List<ConditionType> conditions) {
+
+        if (isHeart) {
+            int warnHigh = conditions.stream()
+                .filter(c -> c.hrWarnHigh != null)
+                .mapToInt(c -> c.hrWarnHigh)
+                .min().orElse(ELDERLY_HR_WARN_HIGH);
+            int warnLow = conditions.stream()
+                .filter(c -> c.hrWarnLow != null)
+                .mapToInt(c -> c.hrWarnLow)
+                .max().orElse(ELDERLY_HR_WARN_LOW);
+
+            // COPD는 베이스라인 +15% 초과 여부도 확인
+            boolean copdAbnormal = false;
+            if (conditions.contains(ConditionType.COPD) && baseline != null) {
+                copdAbnormal = value > baseline[0] * 1.15;
+            }
+
+            return value >= warnHigh || value <= warnLow || copdAbnormal;
+        } else {
+            int warnHigh = conditions.stream()
+                .filter(c -> c.brWarnHigh != null)
+                .mapToInt(c -> c.brWarnHigh)
+                .min().orElse(ELDERLY_BR_WARN_HIGH);
+
+            return value >= warnHigh;
+        }
     }
 
     // 이벤트 발생 시 활성화된 모든 보호자에게 Notification 저장 + FCM 푸시 전송
