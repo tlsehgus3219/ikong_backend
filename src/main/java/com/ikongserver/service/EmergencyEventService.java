@@ -22,7 +22,8 @@ import com.ikongserver.repository.UserConditionRepository;
 import com.ikongserver.repository.UserGuardianMapRepository;
 import com.ikongserver.repository.UsersRepository;
 import com.ikongserver.repository.VitalRepository;
-import jakarta.annotation.PostConstruct;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -121,7 +122,7 @@ public class EmergencyEventService {
 
     // 서버 재시작 후 DB의 PENDING 이벤트를 기반으로 활성 episode 복구
     // 연속 카운터는 복구 불가 — 재시작 후 30초 재관찰 필요
-    @PostConstruct
+    @EventListener(ApplicationReadyEvent.class)
     @Transactional
     public void restoreActiveEpisodes() {
         emergencyEventRepository.findByStatusOrderByCreatedAtDesc("PENDING")
