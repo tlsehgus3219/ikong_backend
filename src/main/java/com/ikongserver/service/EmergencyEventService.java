@@ -327,6 +327,12 @@ public class EmergencyEventService {
                         guardian.getFcmToken(), title, message, "EMERGENCY")));
     }
 
+    // 질환 업데이트 시 해당 유저의 캐시 즉시 무효화
+    public void invalidateConditionsCache(Long userId) {
+        conditionsCache.remove(userId);
+        conditionsCacheTime.remove(userId);
+    }
+
     // 질환 목록 캐시 — 1시간 TTL (이전: 매초 DB 조회)
     private List<ConditionType> getCachedConditions(Users user) {
         Long userId = user.getId();
