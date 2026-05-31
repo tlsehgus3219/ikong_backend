@@ -42,105 +42,70 @@ public class VitalService {
         // 디바이스에서 피보호자 객체 찾기
         Users user = device.getUser();
 
-        // 데이터 안정화 (알고리즘 필터 통과)
-        int stabilizedHR = filterNoise_HR(vitalDto.serialNum(), vitalDto.heartRate());
-        int stabilizedBR = filterNoise_BR(vitalDto.serialNum(), vitalDto.breathRate());
+        // 필터링 (range check → Median(5) → EMA(0.3))
+        int hr = filter(vitalDto.serialNum(), vitalDto.heartRate(), HR_MIN, HR_MAX, hrWindowMap, lastEmaHrMap);
+        int br = filter(vitalDto.serialNum(), vitalDto.breathRate(), BR_MIN, BR_MAX, brWindowMap, lastEmaBrMap);
 
-        // 긴급 상황 검사 및 상태 반환
-        boolean status = false;
+        // 긴급 상황 검사 — 30초 연속 이상이 노이즈 필터 역할
         boolean isFallEvent = emergencyEventService.checkFallEvent(vitalDto, user, device);
-        boolean isHREvent = emergencyEventService.checkHeartBreathEvent(vitalDto, user, device);
-
-        if (isFallEvent || isHREvent) {
-            status = true;
-        }
+        boolean isHREvent = emergencyEventService.checkHeartBreathEvent(hr, br, user, device);
+        boolean status = isFallEvent || isHREvent;
 
         // 프론트엔드로 실시간 SSE 전송
-        ResponseUserVital sseData = new ResponseUserVital(user.getId(), stabilizedHR, stabilizedBR,
-            status);
-        sseService.sendVitalDataToClient(user.getId(), sseData);
+        sseService.sendVitalDataToClient(user.getId(), new ResponseUserVital(user.getId(), hr, br, status));
 
         long currentTime = System.currentTimeMillis();
         long lastSavedTime = lastSavedTimeMap.getOrDefault(vitalDto.serialNum(), 0L);
 
-        // 받은 데이터를 Vital 테이블에 저장
+        // 10초마다 DB 저장
         if (currentTime - lastSavedTime >= 10000) {
-            Vital newVital = Vital.builder()
+            vitalRepository.save(Vital.builder()
                 .user(user)
                 .device(device)
-                .heartRate(stabilizedHR)
-                .breathRate(stabilizedBR)
+                .heartRate(hr)
+                .breathRate(br)
                 .isFallDetected(status)
                 .isPresent(vitalDto.isPresent())
-                .build();
-            vitalRepository.save(newVital);
+                .build());
             lastSavedTimeMap.put(vitalDto.serialNum(), currentTime);
         }
     }
 
-    // 1차 필터 (Median): 윈도우 사이즈 5 (약 5초 분량 데이터)
+    private static final int HR_MIN = 30, HR_MAX = 200;
+    private static final int BR_MIN = 8, BR_MAX = 40;
     private static final int WINDOW_SIZE = 5;
+    private static final double EMA_ALPHA = 0.3;
+
     private final Map<String, LinkedList<Integer>> hrWindowMap = new ConcurrentHashMap<>();
     private final Map<String, LinkedList<Integer>> brWindowMap = new ConcurrentHashMap<>();
-
-    // 2차 필터 (EMA): alpha 0.2 — 급격한 변화 억제, 실제 추세는 반영
-    private static final double EMA_ALPHA = 0.2;
     private final Map<String, Integer> lastEmaHrMap = new ConcurrentHashMap<>();
     private final Map<String, Integer> lastEmaBrMap = new ConcurrentHashMap<>();
 
-    // 생리학적으로 불가능한 값은 윈도우에 넣지 않고 이전 안정화 값 유지
-    private static final int HR_MIN = 30, HR_MAX = 200;
-    private static final int BR_MIN = 8, BR_MAX = 40;
+    private int filter(String serialNum, int raw, int min, int max,
+        Map<String, LinkedList<Integer>> windowMap, Map<String, Integer> emaMap) {
 
-    // 직전 EMA 대비 초당 20bpm 이상 급변하면 스파이크로 간주
-    private static final int HR_MAX_DELTA = 20;
-
-    private int filterNoise_HR(String serialNum, int rawHeartRate) {
-        if (rawHeartRate < HR_MIN || rawHeartRate > HR_MAX) {
-            return lastEmaHrMap.getOrDefault(serialNum, rawHeartRate);
+        // 생리적 범위 벗어난 값은 직전 EMA 유지
+        if (raw < min || raw > max) {
+            return emaMap.getOrDefault(serialNum, raw);
         }
-        int currentEma = lastEmaHrMap.getOrDefault(serialNum, rawHeartRate);
-        if (Math.abs(rawHeartRate - currentEma) > HR_MAX_DELTA) {
-            return currentEma;
-        }
-        return applyHybridFilter(serialNum, rawHeartRate, hrWindowMap, lastEmaHrMap);
-    }
 
-    private int filterNoise_BR(String serialNum, int rawBreathRate) {
-        if (rawBreathRate < BR_MIN || rawBreathRate > BR_MAX) {
-            return lastEmaBrMap.getOrDefault(serialNum, rawBreathRate);
-        }
-        return applyHybridFilter(serialNum, rawBreathRate, brWindowMap, lastEmaBrMap);
-    }
-
-    // 공통 필터 로직
-    private int applyHybridFilter(String serialNum, int rawValue,
-        Map<String, LinkedList<Integer>> windowMap,
-        Map<String, Integer> emaMap) {
-
-        // 1. 기기별 윈도우 바구니 가져오기
+        // Median(5)
         LinkedList<Integer> window = windowMap.computeIfAbsent(serialNum, k -> new LinkedList<>());
-
-        window.add(rawValue);
+        window.add(raw);
         if (window.size() > WINDOW_SIZE) {
             window.removeFirst();
         }
 
-        if (window.size() < WINDOW_SIZE) {
-            emaMap.put(serialNum, rawValue);
-            return rawValue;
-        }
+        List<Integer> sorted = new ArrayList<>(window);
+        Collections.sort(sorted);
+        int median = sorted.get(sorted.size() / 2);
 
-        List<Integer> sortedWindow = new ArrayList<>(window);
-        Collections.sort(sortedWindow);
-        int medianValue = sortedWindow.get(WINDOW_SIZE / 2);
+        // EMA(0.3)
+        int lastEma = emaMap.getOrDefault(serialNum, median);
+        int result = (int) Math.round(median * EMA_ALPHA + lastEma * (1.0 - EMA_ALPHA));
+        emaMap.put(serialNum, result);
 
-        int lastEma = emaMap.getOrDefault(serialNum, medianValue);
-        int finalSmoothedValue = (int) Math.round((medianValue * EMA_ALPHA) + (lastEma * (1.0 - EMA_ALPHA)));
-
-        emaMap.put(serialNum, finalSmoothedValue);
-
-        return finalSmoothedValue;
+        return result;
     }
 
 }
