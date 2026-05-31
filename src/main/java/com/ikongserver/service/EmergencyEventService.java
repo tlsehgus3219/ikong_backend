@@ -163,7 +163,7 @@ public class EmergencyEventService {
     // 한쪽만 이상 → WARNING(HEART_ISSUE/BREATH_ISSUE), 양쪽 동시 이상 → CRITICAL(VITAL_ISSUE)
     // 개인 데이터 3일 미만 시 고령자 표준 임계값으로 자동 전환
     @Transactional
-    public boolean checkHeartBreathEvent(VitalRequestDto vitalDto, Users user, Device device) {
+    public boolean checkHeartBreathEvent(int heartRate, int breathRate, Users user, Device device) {
         Long userId = user.getId();
         int[] baseline = getPersonalBaseline(user);
 
@@ -174,14 +174,14 @@ public class EmergencyEventService {
 
         // 연속 이상 카운터 갱신 — 이상이면 +1, 정상이면 0으로 리셋
         int hrCount;
-        if (isAbnormal(vitalDto.heartRate(), baseline, true, conditions)) {
+        if (isAbnormal(heartRate, baseline, true, conditions)) {
             hrCount = heartConsecutiveMap.merge(userId, 1, Integer::sum);
         } else {
             heartConsecutiveMap.put(userId, 0);
             hrCount = 0;
         }
         int brCount;
-        if (isAbnormal(vitalDto.breathRate(), baseline, false, conditions)) {
+        if (isAbnormal(breathRate, baseline, false, conditions)) {
             brCount = breathConsecutiveMap.merge(userId, 1, Integer::sum);
         } else {
             breathConsecutiveMap.put(userId, 0);
@@ -192,7 +192,7 @@ public class EmergencyEventService {
         boolean brBad = brCount >= ABNORMAL_CONSECUTIVE;
 
         // 이상 지표 개수로 심각도 결정 — 양쪽 동시 이상이면 CRITICAL, 한쪽만이면 WARNING
-        String serialNum = vitalDto.serialNum();
+        String serialNum = device.getSerialNum();
         if (hrBad && brBad) {
             return handleCondition(user, device, "CRITICAL", "VITAL_ISSUE", serialNum);
         } else if (hrBad) {
