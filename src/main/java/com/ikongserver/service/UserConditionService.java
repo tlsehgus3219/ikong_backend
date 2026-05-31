@@ -18,6 +18,7 @@ public class UserConditionService {
 
     private final UserConditionRepository userConditionRepository;
     private final UsersRepository usersRepository;
+    private final EmergencyEventService emergencyEventService;
 
     // 현재 등록된 질환 목록 조회
     @Transactional(readOnly = true)
@@ -50,6 +51,8 @@ public class UserConditionService {
             userConditionRepository.saveAll(newConditions);
             result = request.conditions().stream().distinct().toList();
         }
+
+        emergencyEventService.invalidateConditionsCache(userId);
 
         return new ConditionsResponse(result);
     }

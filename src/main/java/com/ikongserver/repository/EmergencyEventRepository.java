@@ -27,4 +27,7 @@ public interface EmergencyEventRepository extends JpaRepository<EmergencyEvent, 
     long countByUserAndStatus(Users user, String status);
 
     Optional<EmergencyEvent> findById(Long eventId);
+
+    // 서버 재시작 후 활성 episode 복구용 — 전체 PENDING 이벤트 최신순 조회
+    List<EmergencyEvent> findByStatusOrderByCreatedAtDesc(String status);
 }
