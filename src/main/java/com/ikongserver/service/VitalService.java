@@ -44,9 +44,9 @@ public class VitalService {
             return;
         }
 
-        // HR 센서: 필터링(range check → Median(5) → EMA(0.3)) 후 심박·호흡 처리
-        int hr = filter(serialNum, vitalDto.heartRate(), HR_MIN, HR_MAX, hrWindowMap, lastEmaHrMap);
-        int br = filter(serialNum, vitalDto.breathRate(), BR_MIN, BR_MAX, brWindowMap, lastEmaBrMap);
+        // HR 센서: 필터링(range check → Median(9) → Outlier 거부 → Rate Clamp → EMA(0.3)) 후 심박·호흡 처리
+        int hr = filter(serialNum, vitalDto.heartRate(), HR_MIN, HR_MAX, hrWindowMap, lastEmaHrMap, outlierCountHrMap, HR_OUTLIER_THRESHOLD, HR_MAX_STEP);
+        int br = filter(serialNum, vitalDto.breathRate(), BR_MIN, BR_MAX, brWindowMap, lastEmaBrMap, outlierCountBrMap, BR_OUTLIER_THRESHOLD, BR_MAX_STEP);
 
         boolean isHREvent = emergencyEventService.checkHeartBreathEvent(hr, br, user, device);
 
@@ -70,16 +70,27 @@ public class VitalService {
 
     private static final int HR_MIN = 30, HR_MAX = 200;
     private static final int BR_MIN = 8, BR_MAX = 40;
-    private static final int WINDOW_SIZE = 5;
+    private static final int WINDOW_SIZE = 9;
     private static final double EMA_ALPHA = 0.3;
+    // 현재 EMA 대비 이 값 이상 벗어나면 1차 노이즈 의심
+    private static final int HR_OUTLIER_THRESHOLD = 20;
+    private static final int BR_OUTLIER_THRESHOLD = 8;
+    // 노이즈 의심 상태가 이 횟수 이상 연속되면 진짜 심박 변화로 인정
+    private static final int OUTLIER_CONFIRM_COUNT = 5;
+    // 한 스텝에 변할 수 있는 최대 bpm (드리프트 방지)
+    private static final int HR_MAX_STEP = 4;
+    private static final int BR_MAX_STEP = 2;
 
     private final Map<String, LinkedList<Integer>> hrWindowMap = new ConcurrentHashMap<>();
     private final Map<String, LinkedList<Integer>> brWindowMap = new ConcurrentHashMap<>();
     private final Map<String, Integer> lastEmaHrMap = new ConcurrentHashMap<>();
     private final Map<String, Integer> lastEmaBrMap = new ConcurrentHashMap<>();
+    private final Map<String, Integer> outlierCountHrMap = new ConcurrentHashMap<>();
+    private final Map<String, Integer> outlierCountBrMap = new ConcurrentHashMap<>();
 
     private int filter(String serialNum, int raw, int min, int max,
-        Map<String, LinkedList<Integer>> windowMap, Map<String, Integer> emaMap) {
+        Map<String, LinkedList<Integer>> windowMap, Map<String, Integer> emaMap,
+        Map<String, Integer> outlierCountMap, int outlierThreshold, int maxStep) {
 
         if (raw < min || raw > max) {
             return emaMap.getOrDefault(serialNum, raw);
@@ -96,7 +107,23 @@ public class VitalService {
         int median = sorted.get(sorted.size() / 2);
 
         int lastEma = emaMap.getOrDefault(serialNum, median);
-        int result = (int) Math.round(median * EMA_ALPHA + lastEma * (1.0 - EMA_ALPHA));
+
+        if (Math.abs(median - lastEma) > outlierThreshold) {
+            int count = outlierCountMap.merge(serialNum, 1, Integer::sum);
+            if (count >= OUTLIER_CONFIRM_COUNT) {
+                // N회 연속으로 큰 차이 → 진짜 심박 변화로 인정, EMA를 현재 median으로 점프
+                outlierCountMap.put(serialNum, 0);
+                emaMap.put(serialNum, median);
+                return median;
+            }
+            return lastEma;
+        }
+
+        outlierCountMap.put(serialNum, 0);
+
+        int diff = median - lastEma;
+        int clampedDiff = Math.max(-maxStep, Math.min(maxStep, diff));
+        int result = (int) Math.round(lastEma + clampedDiff * EMA_ALPHA);
         emaMap.put(serialNum, result);
 
         return result;
