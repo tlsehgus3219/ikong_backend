@@ -389,19 +389,39 @@ public class EmergencyEventService {
         return baseline;
     }
 
-    private boolean isAbnormal(int value, int[] baseline, boolean isHeart,
-        List<ConditionType> conditions) {
-        if (!conditions.isEmpty()) {
-            return isAbnormalByCondition(value, baseline, isHeart, conditions);
-        }
+    // 이상 여부 판단
+    // 질환 미등록: 기존 기준선 로직만 적용
+    // OR 질환(즉시 위험): 기존 기준선 이상 OR 질환 임계값 초과 — 하나라도 이상이면 알림
+    // AND 질환(중간 위험): 기존 기준선 이상 AND 질환 임계값 초과 — 둘 다 이상이어야 알림
+    private boolean isAbnormal(int value, int[] baseline, boolean isHeart, List<ConditionType> conditions) {
+        // 기존 기준선 로직
+        boolean baselineAbnormal;
         if (baseline == null) {
-            return isHeart
+            baselineAbnormal = isHeart
                 ? (value < ELDERLY_HR_WARN_LOW || value > ELDERLY_HR_WARN_HIGH)
                 : (value < ELDERLY_BR_WARN_LOW || value > ELDERLY_BR_WARN_HIGH);
+        } else {
+            int base = isHeart ? baseline[0] : baseline[1];
+            baselineAbnormal = value < base * (1 - WARNING_RATIO)
+                            || value > base * (1 + WARNING_RATIO);
         }
-        int baselineValue = isHeart ? baseline[0] : baseline[1];
-        return value < baselineValue * (1 - WARNING_RATIO)
-            || value > baselineValue * (1 + WARNING_RATIO);
+
+        // 질환 미등록 — 기존 로직만
+        if (conditions.isEmpty()) {
+            return baselineAbnormal;
+        }
+
+        // 질환 임계값 초과 여부
+        boolean conditionAbnormal = checkConditionThreshold(value, baseline, isHeart, conditions);
+
+        // OR 질환(즉시 위험)이 하나라도 있으면 → 둘 중 하나라도 이상이면 알림
+        boolean hasOrCondition = conditions.stream().anyMatch(c -> !c.requireBoth);
+        if (hasOrCondition) {
+            return baselineAbnormal || conditionAbnormal;
+        }
+
+        // AND 질환(중간 위험)만 있으면 → 둘 다 이상이어야 알림
+        return baselineAbnormal && conditionAbnormal;
     }
 
     private boolean isAbnormalByCondition(int value, int[] baseline, boolean isHeart,
